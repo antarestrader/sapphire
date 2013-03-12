@@ -8,7 +8,7 @@ $digit = 0-9
 $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
-@keywords = if|then|else|elsif|class|module|do|while|until|case|when|end
+@keywords = if|then|else|elsif|class|module|do|while|until|case|when|end|nil
 
 tokens :-
 

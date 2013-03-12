@@ -21,9 +21,12 @@ token = P.token show emptyPosition
 tokenEq :: Token -> TParser Token
 tokenEq t = token (\t' -> if t == t' then Just t else Nothing)
 
-comma = tokenEq TComma <?> "',' (comma)"
-open  = tokenEq TOpen  <?> "'('"
-close = tokenEq TClose <?> "')'"
+comma  = tokenEq TComma        <?> "',' (comma)"
+open   = tokenEq TOpen         <?> "'('"
+close  = tokenEq TClose        <?> "')'"
+bopen  = tokenEq TBracket      <?> "'['"
+bclose = tokenEq TBracketClose <?> "']'" 
+nil    = keyword "nil" >> return ENil
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
 foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)   
@@ -60,8 +63,8 @@ pscope xs = do
   (pscope (x:xs)) <|> (return $ EVar $ Var x (reverse xs))
 
 var :: TParser Exp
-var = do
-  s <- var'
+var = nil <|> do
+  s <- var' 
   (pscope [s]) <|> (return $ EVar $ Var s []) <?> "Variable"
 
 
@@ -126,11 +129,18 @@ args' safe e0 = do
     args'' s = (between open close (sepBy (expr <?> "argument") comma))  
        <|> if s then (sepBy1 (expr1a <?> "argument") comma) else (parserZero) 
 
+indexes :: Exp -> TParser Exp
+indexes e0 = do
+    as <- (between bopen bclose (sepBy (expr <?> "index argument") comma))
+    return $ addArgs e0 as
+  where
+    addArgs e' as = Call e' "[]" as
+
 safeArgs :: Exp -> TParser Exp
-safeArgs = args' False
+safeArgs e = indexes e <|> args' False e
 
 args :: Exp -> TParser Exp
-args = args' True
+args e = indexes e <|> args' True e
 
 op :: TParser (Op,Exp)
 op = do
@@ -151,10 +161,10 @@ data Exp =
   | EInt Integer
   | EFloat Double
   | EString String -- TODO make this smarter
+  | ENil
   | OpStr Exp [(Op,Exp)]
   | Call Exp String [Exp]
   | Send Exp String [Exp]
-  | Index Exp [Exp]
   | Assign LHS Exp
   | OpAssign LHS Op Exp
   | If {predicate :: Exp,consequent :: Exp ,alternate :: Maybe Exp}
