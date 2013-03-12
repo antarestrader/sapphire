@@ -83,13 +83,13 @@ expr0 = var <|> (pscope []) <|> int <|> float <|> paren
 expr1 :: TParser Exp 
 expr1 = do
   e0 <- expr0
-  foldP e0 (message `andor` params) 
+  foldP e0 (message `andor` args) 
 
 
 expr1a :: TParser Exp
 expr1a = do
   e0 <- expr0
-  foldP e0 (message `andor` safeParams)  
+  foldP e0 (message `andor` safeArgs)  
 
 expr3 :: TParser Exp
 expr3 = do
@@ -112,25 +112,25 @@ message e0 = do
     trans TSend = Send
 
 
-params' :: Bool -> Exp -> TParser Exp
-params' safe e0 = do
-      ps <- params'' safe
-      return $ addParams e0 ps 
+args' :: Bool -> Exp -> TParser Exp
+args' safe e0 = do
+      ps <- args'' safe
+      return $ addArgs e0 ps 
   where
-    addParams :: Exp -> [Exp] -> Exp
-    addParams (Call e s []) ps = Call e s ps
-    addParams (Send e s []) ps = Send e s ps
-    addParams (EVar (Var s [])) ps = Call (EVar Self) s ps
-    addParams e ps = Call e "call" ps
+    addArgs :: Exp -> [Exp] -> Exp
+    addArgs (Call e s []) ps = Call e s ps
+    addArgs (Send e s []) ps = Send e s ps
+    addArgs (EVar (Var s [])) ps = Call (EVar Self) s ps
+    addArgs e ps = Call e "call" ps
 
-    params'' s = (between open close (sepBy (expr <?> "argument") comma))  
+    args'' s = (between open close (sepBy (expr <?> "argument") comma))  
        <|> if s then (sepBy1 (expr1a <?> "argument") comma) else (parserZero) 
 
-safeParams :: Exp -> TParser Exp
-safeParams = params' False
+safeArgs :: Exp -> TParser Exp
+safeArgs = args' False
 
-params :: Exp -> TParser Exp
-params = params' True
+args :: Exp -> TParser Exp
+args = args' True
 
 op :: TParser (Op,Exp)
 op = do
