@@ -1,66 +1,108 @@
 module LineParser where
 
-type LineNo = Int
-type Offset = Int
-type Position = (LineNo,Offset)
+import Prelude hiding (getLine, lines)
+import Text.Printf
+import qualified Prelude as P
+import Control.Monad
+import Control.Monad.State
 
-data Fragment= Fragment {
-    position ::  Position
-  , fragment :: [Char]
-  } | BlankLine LineNo deriving Show
+type LineNo = Integer
+type Offset = Integer
 
-foffset = snd . position
+data Line = Line {line :: String, offset :: Offset, lineNo :: LineNo, block :: (Maybe CodeBlock)}
+          | BlankLine LineNo
 
-data Line = Line [Fragment] (Maybe CodeBlock) deriving Show
+data CodeBlock = Block {lines :: [Line], startLine:: LineNo, indent :: Offset, filename :: FilePath}
 
-type CodeBlock = [Line]
+instance Show Line where
+  show (BlankLine i) = printf "%4d:\n" i
+  show l = printf "%4d: %*s%s\n%s" (lineNo l) (offset l) "" (line l) (maybe "" show (block l))  
 
-stripLine :: LineNo -> [Char]  -> Fragment
+instance Show CodeBlock where
+  show blk = printf "Block(start:%d, indent:%d, lines:%d, file:'%s')\n%s\n" (startLine blk) (indent blk) (length $ lines blk) (filename blk) (show $ lines blk)
+
+data LParserState = LPS 
+  { fileName        :: FilePath
+  , input'          :: [String] -- lines to be parsed
+  , nextLine'       :: Maybe Line -- to allow a line to be put back into the input stack
+  , currentLineNum' :: LineNo 
+  }
+
+type LParser a = State LParserState a
+
+parseCode :: FilePath -> String -> CodeBlock
+parseCode file text =
+  let ls = P.lines text
+      s = LPS { fileName = file , input' = ls, nextLine' = Nothing, currentLineNum' = 0}
+  in evalState parseLines s
+
+parseFile :: FilePath -> IO CodeBlock
+parseFile fp = (parseCode fp) `fmap` readFile fp 
+
+getLine :: LParser (Maybe Line)
+getLine = do
+  s <- get
+  case (nextLine' s, input' s) of
+    (Nothing, (l:ls)) -> do
+      let n = 1 + currentLineNum' s
+      put s {currentLineNum' = n, input' = ls}
+      return $ Just $ stripLine n l
+    (Just l,_) -> do
+      put s {nextLine' = Nothing}
+      return $ Just l
+    (Nothing, []) -> return Nothing
+
+ungetLine :: Line -> LParser ()
+ungetLine l = do
+  s <- get
+  put s {nextLine' = Just l}
+
+compareLine :: Offset -> LParser (Maybe (Line,Ordering))
+compareLine i = do
+  maybe_l <- getLine
+  case maybe_l of 
+    Nothing -> return Nothing
+    Just l@(BlankLine _) -> return $ Just (l,EQ)
+    Just l -> return $ Just (l, compare (offset l) i )
+
+parseLines ::  LParser CodeBlock
+parseLines  = do
+  l' <- getLine
+  case l' of 
+    Nothing -> error "parse lines called with nothing in buffer"
+    Just l -> parseLines' (lineNo l) (offset l) [l]
+
+parseLines' :: LineNo -> Offset -> [Line] -> LParser CodeBlock
+parseLines' s i ls = do
+  c <- compareLine i
+  case c of
+    Nothing -> mkBlock s i (reverse ls)  -- no input text left
+    Just (l,EQ) -> parseLines' s i (l:ls) -- just another line in the same block
+    Just (l,GT) -> do -- a further indent
+      ungetLine l
+      blk <- parseLines
+      parseLines' s i (addBlockToHead blk ls)
+    Just (l,LT) -> ungetLine l >> mkBlock s i (reverse ls)  -- end of block founds 
+
+mkBlock :: LineNo -> Offset -> [Line]  -> LParser CodeBlock
+mkBlock sl i ls = do
+  fn <- gets fileName
+  return Block {lines = ls, startLine = sl, indent = i, filename = fn} 
+
+addBlockToHead :: CodeBlock -> [Line] -> [Line]
+addBlockToHead blk (l:ls) = case (block l) of
+  Nothing ->  let l' = l {block = Just blk} in (l':ls)
+  Just existing -> 
+    let l'   = Line { line = "", offset = indent blk, lineNo = startLine existing, block = Just existing}
+	blk' = prependLine l' blk
+	l''  = l { block = Just blk'}
+    in  (l'':ls)
+
+prependLine :: Line -> CodeBlock -> CodeBlock
+prependLine l bk = bk {lines = (l:(lines bk)), startLine = lineNo l}
+
+stripLine :: LineNo -> [Char]  -> Line
 stripLine = stripLine' 0 where
   stripLine' _ l [] = BlankLine l
   stripLine' i l (' ':cs) = stripLine' (i+1) l cs
-  stripLine' i l cs = Fragment {position = (l,i), fragment = cs}
-
-makeFragments :: String -> [Fragment]
-makeFragments s = reverse . snd $ foldl fn (1,[]) (lines s)
- where 
-  fn (l,fs) cs = 
-    let f = stripLine l cs
-    in 
-      case f of 
-        BlankLine _ -> (l+1,fs)
-	otherwise -> (l+1,f:fs)
-
-makeLines :: [Fragment] -> CodeBlock
-makeLines fs = fst $ makeLines' 0  [] fs
-
-makeLines' ::  Offset ->[Line] -> [Fragment] -> (CodeBlock,[Fragment])
-makeLines' _ rs [] = (reverse rs,[])
-makeLines' o rs (f:fs) | (foffset f) < o = (reverse rs, (f:fs))
-makeLines' o rs fs = 
-  let (r,fs') = makeLine fs in 
-  makeLines' o (r:rs) fs'
-
-makeLine :: [Fragment] -> (Line,[Fragment])
-makeLine (f:[]) = (Line [f] Nothing,[])
-makeLine (f:n:fs) | (foffset f) >= (foffset n) = (Line [f] Nothing,(n:fs))
-makeLine (f:fs) = let (gs,blk,fs') = makeBlock (foffset f) fs in (Line (f:gs) (Just blk), fs')
-
-makeBlock :: Offset ->[Fragment] -> ([Fragment],CodeBlock,[Fragment])
-makeBlock o fs = makeBlock' o [] fs
-  where 
-    makeBlock' o rs (f:fs) =
-      let x = makeLines' (foffset f) [] (f:fs)
-      in
-        case x of
-	  (ls,[]) -> (rs, ls, [])
-	  (ls,(f':fs')) |  ((foffset f') <= o) ->  (rs, ls, (f':fs'))
-	  (ls,fs') ->  makeBlock' o (rs++(deline ls)) fs'
-    deline [] = []
-    deline ((Line fs Nothing):ls) = fs ++ deline ls
-    deline ((Line fs (Just rs)):ls) = fs ++ deline rs ++ deline ls
-
-lineFile :: FilePath -> IO CodeBlock
-lineFile f = do
-  s <- readFile f
-  return $ (makeLines . makeFragments) s
+  stripLine' i l cs = Line {line = cs, lineNo = l, offset = i, block = Nothing}
