@@ -30,7 +30,16 @@ data LParserState = LPS
 
 type LParser a = State LParserState a
 
+unlineBlock :: CodeBlock -> String
+unlineBlock b = concat $ map lineToString (lines b) 
+
+lineToString :: Line -> String
+lineToString (BlankLine _) = "\n"
+lineToString l | (line l == "") =  (maybe "" unlineBlock (block l))
+lineToString l = (replicate (fromIntegral $ offset l) ' ') ++ (line l) ++ "\n" ++ (maybe "" unlineBlock (block l))  
+
 parseCode :: FilePath -> String -> CodeBlock
+parseCode file "" = Block {lines = [], startLine = 0, indent = 0, filename = file}
 parseCode file text =
   let ls = P.lines text
       s = LPS { fileName = file , input' = ls, nextLine' = Nothing, currentLineNum' = 0}
@@ -70,6 +79,7 @@ parseLines  = do
   l' <- getLine
   case l' of 
     Nothing -> error "parse lines called with nothing in buffer"
+    Just l@(BlankLine _) -> parseLines >>= (return . prependLine l) -- ignore blank line
     Just l -> parseLines' (lineNo l) (offset l) [l]
 
 parseLines' :: LineNo -> Offset -> [Line] -> LParser CodeBlock
@@ -99,7 +109,9 @@ addBlockToHead blk (l:ls) = case (block l) of
     in  (l'':ls)
 
 prependLine :: Line -> CodeBlock -> CodeBlock
-prependLine l bk = bk {lines = (l:(lines bk)), startLine = lineNo l}
+prependLine l bk = bk {lines = (l:(lines bk)), startLine = lineNo' l} where
+  lineNo' (BlankLine l) = l
+  lineNo' l = lineNo l
 
 stripLine :: LineNo -> [Char]  -> Line
 stripLine = stripLine' 0 where

@@ -3,5 +3,6 @@ Tokens.hs
 *.hi
 *.out
 *.exe
+*.swo
 *.swp
 *~
