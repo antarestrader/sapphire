@@ -1,6 +1,7 @@
 module Parser where
 
 import Tokens
+import LineParser
 import Control.Monad
 import Data.Maybe
 import Text.Parsec hiding (token)

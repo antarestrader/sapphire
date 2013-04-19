@@ -10,9 +10,9 @@ type LineNo = Integer
 type Offset = Integer
 
 data Line = Line {line :: String, offset :: Offset, lineNo :: LineNo, block :: (Maybe CodeBlock)}
-          | BlankLine LineNo
+          | BlankLine LineNo deriving (Eq)
 
-data CodeBlock = Block {lines :: [Line], startLine:: LineNo, indent :: Offset, filename :: FilePath}
+data CodeBlock = Block {lines :: [Line], startLine:: LineNo, indent :: Offset, filename :: FilePath} deriving (Eq)
 
 instance Show Line where
   show (BlankLine i) = printf "%4d:\n" i
