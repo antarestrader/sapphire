@@ -14,6 +14,7 @@ $digit = 0-9
 $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
+@stringchar = \\\"|[^\"] -- " <- this is here to keep the text formattin intact
 @keywords = if|then|else|elsif|class|module|do|while|until|case|when|end|nil|def|define
 
 tokens :-
@@ -39,9 +40,10 @@ tokens :-
   \)                              {\(AlexPn _ _ i) s -> (i, TClose)}
   \[                              {\(AlexPn _ _ i) s -> (i, TBracket)}
   \]                              {\(AlexPn _ _ i) s -> (i, TBracketClose)}
+  $opSym+"="                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ init s)}
   $opSym+                         {\(AlexPn _ _ i) s -> (i, TOperator s)}
-  "="$opSym+                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ tail s)}
   \.                              {\(AlexPn _ _ i) s -> (i, TDot)}
+  \"@stringchar*\"                 {\(AlexPn _ _ i) s -> (i, TString s)}
 {
 
 data T =
@@ -58,6 +60,7 @@ data T =
   TAtom  String    |
   TLabel String    |
   TOperator String |
+  TString String   |
   TEnd             |
   TBlock CodeBlock
     deriving (Eq, Show)

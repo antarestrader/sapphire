@@ -4,7 +4,7 @@ import Tokens
 import LineParser
 import Control.Monad
 import Data.Maybe
-import Text.Parsec hiding (token)
+import Text.Parsec hiding (token, string)
 import qualified Text.Parsec as P
 import Text.Parsec.Pos
 
@@ -64,6 +64,12 @@ float = tokenP testTok <?>  "Floating Point Number"
   where
     testTok Token{token=(TFloat d)} = Just $ EFloat d
     testTok _ = Nothing
+
+string :: TParser Exp
+string = tokenP tok <?> "String literal"
+  where
+    tok Token {token=TString s} = Just $ EString s
+    tok _ = Nothing
 
 paren :: TParser Exp
 paren = between open close expr
@@ -132,7 +138,7 @@ sent exp = do
   return $ Send exp s args
 
 expr0 :: TParser Exp
-expr0 = paren <|> var <|> float <|> int
+expr0 = paren <|> var <|> float <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
