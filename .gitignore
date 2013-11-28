@@ -1,0 +1,8 @@
+Tokens.hs
+*.o
+*.hi
+*.out
+*.exe
+*.swo
+*.swp
+*~

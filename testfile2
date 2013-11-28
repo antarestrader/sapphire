@@ -1,0 +1,16 @@
+aaa
+bbb
+ccc
+  -> 2 accc
+  -> 2 bccc
+    -> 4 abccc
+    -> 4 bbccc
+    -> 4 cbccc
+  -> 2 cccc
+  -> 2 dccc
+ddd
+eee
+    -> 4 aaeee
+  -> 2 beee
+  -> 2 ceee
+fff
