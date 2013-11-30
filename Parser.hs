@@ -144,7 +144,7 @@ sent exp = do
   return $ Send exp s args
 
 expr0 :: TParser Exp
-expr0 = paren <|> var <|> float <|> int <|> string <?> "basic expression unit"
+expr0 = paren <|> nil <|> var <|> float <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp

@@ -1,6 +1,6 @@
 module Eval where
 
-import Data.ByteString
+import qualified Data.ByteString as B
 import qualified Data.Map as M
 import Parser
 
@@ -8,6 +8,10 @@ eval :: Context -> Exp -> IO (Value, Context)
 eval c (EInt i) = return ((VInt i), c)
 eval c (EFloat f) = return ((VFloat f),c)
 eval c ENil = return (VNil,c)
+eval c exp = do
+  putStrLn "Cannot yet evaluate the following expression"
+  print exp
+  return (VNil,c)
 
 data Value =
     VInt Integer
@@ -24,7 +28,7 @@ instance Show Value where
   show (VString st) = show $ bytes st
   show VNil = "nil"
 
-data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: ByteString} --FixMe
+data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} --FixMe
 
 type Pid = Integer
 
