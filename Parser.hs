@@ -71,6 +71,12 @@ string = tokenP tok <?> "String literal"
     tok Token {token=TString s} = Just $ EString s
     tok _ = Nothing
 
+atom :: TParser Exp
+atom = tokenP tok
+  where
+    tok Token {token=TAtom s} = Just $ EAtom s
+    tok _ = Nothing
+
 paren :: TParser Exp
 paren = between open close expr
 
@@ -155,6 +161,7 @@ data Exp =
   | EInt Integer
   | EFloat Double
   | EString String -- TODO make this smarter
+  | EAtom String
   | ENil
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp

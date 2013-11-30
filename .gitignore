@@ -1,4 +1,5 @@
 Tokens.hs
+Main
 *.o
 *.hi
 *.out
