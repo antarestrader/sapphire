@@ -9,6 +9,9 @@ data Exp =
   | ENil
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp
+  | Lambda [String] Exp
+  | Define String [String] [Exp]
+  | Def String [String] [Exp]
   | Apply Var [Exp]
   | Call Exp String [Exp]
   | Send Exp String [Exp]

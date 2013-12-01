@@ -1,7 +1,7 @@
 module Parser where
 
 import Tokens
-import LineParser
+import LineParser (parseCode)
 import AST
 import Control.Monad
 import Data.Maybe
@@ -31,6 +31,12 @@ tdot   = tokenEq TDot          <?> "'.' (Call)"
 tsend  = tokenEq TSend         <?> "'->' (Send)"
 assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
 nil    = keyword "nil" >> return ENil
+
+block  = do
+  let tok Token {token = (TBlock b)} = Just b
+      tok _ = Nothing
+  blk <- tokenP tok
+  return $ Block []  --TODO parse codeblock
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
 foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)   
@@ -83,6 +89,8 @@ paren = between open close expr
 argumentList :: TParser [Exp]
 argumentList = between open close $ sepBy expr comma
 
+paramList = between open close $ sepBy identifier comma
+
 identifier :: TParser String
 identifier = tokenP tok
   where
@@ -126,6 +134,16 @@ assign lhs' = do
 transLHS :: Exp -> TParser LHS
 transLHS (EVar v) = return $LVar v --TODO add indexed, called, and sent here
 transLHS _ = fail "illigal Left Hand Side of assignment expression"
+
+lambda :: TParser Exp
+lambda = do
+  let single = do
+        tsend
+        expr
+  keyword "lambda"
+  params <- option [] paramList
+  exp <- block <|> single
+  return $ Lambda params exp
   
 indexed exp = do
   idx <- between bopen bclose expr
@@ -149,10 +167,13 @@ expr0 = paren <|> nil <|> var <|> atom <|> float <|> int <|> string <?> "basic e
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
 
-expr :: TParser Exp
-expr = do
+expr1 :: TParser Exp
+expr1 = do
     exp <- expr0
     extend exp
   where
     extend exp = (extension exp >>= extend) <|> return exp
 
+statement = lambda
+
+expr = statement <|> expr1
