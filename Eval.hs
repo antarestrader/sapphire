@@ -2,12 +2,14 @@ module Eval where
 
 import qualified Data.ByteString as B
 import qualified Data.Map as M
-import Parser
+import AST
+
 
 eval :: Context -> Exp -> IO (Value, Context)
 eval c (EInt i) = return ((VInt i), c)
 eval c (EFloat f) = return ((VFloat f),c)
 eval c ENil = return (VNil,c)
+eval c (EAtom a) = return (VAtom a, c)
 eval c (EVar Var {name=var}) = case M.lookup var c of  --TODO Scope
   Just val -> return (val, c)
   Nothing  -> do -- TODO Error
@@ -26,6 +28,7 @@ data Value =
   | VFloat Double
   | VString SapString
   | VNil
+  | VAtom String
   | VFunction --FixMe
   | VPid Pid
   | VObject Object
@@ -35,6 +38,7 @@ instance Show Value where
   show (VFloat f) = show f
   show (VString st) = show $ bytes st
   show VNil = "nil"
+  show (VAtom a) = ':':a
 
 data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} --FixMe
 

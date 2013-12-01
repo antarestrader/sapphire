@@ -2,6 +2,7 @@ module Parser where
 
 import Tokens
 import LineParser
+import AST
 import Control.Monad
 import Data.Maybe
 import Text.Parsec hiding (token, string)
@@ -9,7 +10,6 @@ import qualified Text.Parsec as P
 import Text.Parsec.Pos
 
 type TParser = Parsec [Token] ()
-type Op = String
 
 emptyPosition _ =  newPos "" 1 1
 
@@ -90,17 +90,17 @@ identifier = tokenP tok
     tok _ = Nothing
 
 var :: TParser Exp
-var = local <|> global
-  where
-    local = do
-      v <- identifier
-      pscope [v] <|> (return $ EVar $ Var v [])
-    global = do
-      pscope [""]
-    pscope xs = do
-      tokenEq TScope
-      x <- identifier
-      (pscope (x:xs)) <|> (return $ EVar $ Var x (reverse xs))
+var = do 
+    let pscope xs = do
+          tokenEq TScope
+          x <- identifier
+          (pscope (x:xs)) <|> (return $ Var x (reverse xs))
+    let local = do
+          v <- identifier
+          pscope [v] <|> (return $ Var v [])
+    let global = pscope [""]
+    var <- local <|> global
+    (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
 
 op :: TParser (Op,Exp)
 op = do
@@ -144,7 +144,7 @@ sent exp = do
   return $ Send exp s args
 
 expr0 :: TParser Exp
-expr0 = paren <|> nil <|> var <|> float <|> int <|> string <?> "basic expression unit"
+expr0 = paren <|> nil <|> var <|> atom <|> float <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
@@ -156,33 +156,3 @@ expr = do
   where
     extend exp = (extension exp >>= extend) <|> return exp
 
-data Exp = 
-    EVar Var 
-  | EInt Integer
-  | EFloat Double
-  | EString String -- TODO make this smarter
-  | EAtom String
-  | ENil
-  | OpStr Exp [(Op,Exp)]
-  | Index Exp Exp
-  | Apply String [Exp]
-  | Call Exp String [Exp]
-  | Send Exp String [Exp]
-  | Assign LHS Exp
-  | OpAssign LHS Op Exp
-  | If {predicate :: Exp,consequent :: Exp ,alternate :: Maybe Exp}
-  | While Exp Exp
-  | Until Exp Exp
-  | Class Var (Maybe Var) Exp
-  | Module Var Exp
-  | Block [Exp]  deriving Show
-
-type Scope = [String]
-
-data Var = Var {name :: String, scope :: Scope} | Self deriving Show -- TODO: make scope its own thing
-
-data LHS = 
-    LVar Var
-  | LIndex Exp [Exp]  -- Translate to <Exp>.call(`[]=` <Exp assignment>, [<Exp index>]
-  | LCall Exp String
-  | LSend Exp String deriving Show
