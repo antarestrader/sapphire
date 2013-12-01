@@ -8,7 +8,15 @@ eval :: Context -> Exp -> IO (Value, Context)
 eval c (EInt i) = return ((VInt i), c)
 eval c (EFloat f) = return ((VFloat f),c)
 eval c ENil = return (VNil,c)
-eval c exp = do
+eval c (EVar Var {name=var}) = case M.lookup var c of  --TODO Scope
+  Just val -> return (val, c)
+  Nothing  -> do -- TODO Error
+    putStrLn $ "Not in scope: " ++ var
+    return (VNil, c)
+eval c (Assign (LVar Var {name=var}) exp) = do
+  (val, c') <- eval c exp
+  return (val, M.insert var val c')
+eval c exp = do -- TODO Error
   putStrLn "Cannot yet evaluate the following expression"
   print exp
   return (VNil,c)

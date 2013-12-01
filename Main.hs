@@ -2,6 +2,7 @@ module Main where
 
 import System.Environment
 import System.IO
+import qualified Data.Map as M
 import LineParser
 import Parser
 import Eval
@@ -9,7 +10,7 @@ import Eval
 
 main :: IO ()
 main = do
-  let context = emptyContext
+  let context = M.fromList [("test",VInt 5)]
   repl context
  
 repl :: Context -> IO ()

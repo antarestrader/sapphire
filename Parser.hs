@@ -165,6 +165,7 @@ data Exp =
   | ENil
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp
+  | Apply String [Exp]
   | Call Exp String [Exp]
   | Send Exp String [Exp]
   | Assign LHS Exp
