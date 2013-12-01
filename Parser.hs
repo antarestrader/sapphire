@@ -113,7 +113,7 @@ var = do
 op :: TParser (Op,Exp)
 op = do
     o <-  tokenP testTok
-    e <- expr
+    e <- expr'
     return(o,e)
   where
     testTok Token{ token=(TOperator op)} = Just op
@@ -174,6 +174,13 @@ expr1 = do
   where
     extend exp = (extension exp >>= extend) <|> return exp
 
+
 statement = lambda
 
 expr = statement <|> expr1
+
+expr' = statement <|> expr1a
+  where
+    expr1a = expr0 >>= extend
+    extend exp = (extension' exp >>= extend) <|> return exp
+    extension' exp = assign exp <|> indexed exp <|> called exp <|> sent exp
