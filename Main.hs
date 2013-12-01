@@ -4,8 +4,10 @@ import System.Environment
 import System.IO
 import qualified Data.Map as M
 import LineParser
+import AST
 import Parser
 import Eval
+import Context
 
 
 main :: IO ()
