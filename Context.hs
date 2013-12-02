@@ -17,11 +17,11 @@ insert (Var {name=s, scope=[]}) val c = M.insert s val c
 precedence :: Context -> M.Map Op Precedence
 precedence _ = -- TODO read from Context
   M.fromList [
-      ("+",(6,L,L))
-    , ("-",(6,L,L))
-    , ("*",(7,L,L))
-    , ("/",(7,L,L))
-    , ("<",(4,N,L))
+      ("+",(6,L,N))
+    , ("-",(6,L,N))
+    , ("*",(7,L,N))
+    , ("/",(7,L,N))
+    , ("<",(4,N,N))
     , (">",(4,N,L))
     , ("==",(4,N,L))
   ]

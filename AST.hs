@@ -33,7 +33,7 @@ type Op = String
 
 type Precedence = (Int, AssocLR, AssocLR)
 
-data AssocLR = L | R | N
+data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
 data Var = Var {name :: String, scope :: Scope} | Self deriving Show -- TODO: make scope its own thing
   -- TODO: Better Show for Var
