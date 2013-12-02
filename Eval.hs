@@ -4,25 +4,33 @@ import qualified Data.Map as M
 import AST
 import Context
 import Prelude hiding (lookup) 
+import Control.Monad
+import Control.Monad.Error
+import Control.Monad.State
 
-eval :: Context -> Exp -> IO (Value, Context)
-eval c (EInt i) = return ((VInt i), c)
-eval c (EFloat f) = return ((VFloat f),c)
-eval c ENil = return (VNil,c)
-eval c (EAtom a) = return (VAtom a, c)
-eval c (OpStr a ops) = eval c (shunt (precedence c) [a] [] ops)
-eval c (EVar var) = case lookup var c of
-  Just val -> return (val, c)
-  Nothing  -> do -- TODO Error
-    putStrLn $ "Not in scope: " ++ (show var)
-    return (VNil, c)
-eval c (Assign (LVar var) exp) = do
-  (val, c') <- eval c exp
-  return (val, insert var val c')
-eval c exp = do -- TODO Error
-  putStrLn "Cannot yet evaluate the following expression"
-  print exp
-  return (VNil,c)
+type EvalM a= StateT Context (ErrorT String IO) a
+
+runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
+runEvalM e c = runErrorT $ runStateT e c
+
+eval :: Exp -> EvalM Value
+eval (EInt i) = return (VInt i)
+eval (EFloat f) = return (VFloat f)
+eval ENil = return VNil
+eval (EAtom a) = return (VAtom a)
+eval (OpStr a ops) = do
+  c <- get
+  eval (shunt (precedence c) [a] [] ops)
+eval (EVar var) = do
+  val' <- gets (lookup var)
+  case val' of
+    Just val -> return val
+    Nothing  -> throwError $ "Not in scope: " ++ (show var)
+eval (Assign (LVar var) exp) = do
+  val <- eval exp
+  modify (insert var val)
+  return val
+eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 -- Impliments the Shunting-yard Algorithm
 -- of Edsger Dijstra as described at
