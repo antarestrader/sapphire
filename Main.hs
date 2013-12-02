@@ -9,11 +9,18 @@ import AST
 import Parser
 import Eval
 import Context
+import qualified BuiltinFunctions as F
 
 
 main :: IO ()
 main = do
-  let context = M.fromList [("test",VInt 5)]
+  let 
+     context =M.fromList [
+        ("test", VInt 5)
+      , ("add" , VFunction F.add (2,Just 2))
+      , ("+"   , VFunction F.add (2,Just 2))
+      , ("puts", VFunction F.puts (0,Nothing))
+      ]
   repl context
  
 repl :: Context -> IO ()

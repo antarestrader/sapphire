@@ -3,8 +3,6 @@ module Context where
 import qualified Data.Map as M
 import AST
 
-type Context = M.Map String Value
-
 emptyContext = M.empty :: Context
 
 lookup :: Var -> Context -> Maybe Value

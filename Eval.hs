@@ -8,12 +8,8 @@ import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
 
-type EvalM a= StateT Context (ErrorT String IO) a
-
-runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
-runEvalM e c = runErrorT $ runStateT e c
-
 eval :: Exp -> EvalM Value
+eval (EValue val) = return val
 eval (EInt i) = return (VInt i)
 eval (EFloat f) = return (VFloat f)
 eval ENil = return VNil
@@ -30,6 +26,16 @@ eval (Assign (LVar var) exp) = do
   val <- eval exp
   modify (insert var val)
   return val
+eval (Apply var argExprs) = do
+  fn <- gets (lookup var)
+  case fn of
+    Nothing -> throwError $ "Not in scope: " ++ (show var)
+    Just (VFunction f arity) -> if checkArity arity (length argExprs) 
+      then mapM eval argExprs >>= f
+      else throwError $
+          "Arity Mismatch on function " ++ show var ++ 
+	  " with " ++ show (length argExprs) ++" arguments."
+    Just val -> eval (Call (EValue val) "call" argExprs)
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 -- Impliments the Shunting-yard Algorithm

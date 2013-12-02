@@ -2,10 +2,13 @@ module AST where
 
 import qualified Data.ByteString as B
 import qualified Data.Map as M
+import Control.Monad.Error
+import Control.Monad.State
 
 data Exp = 
     EVar Var 
   | EInt Integer
+  | EValue Value -- allows values to be "shoved" values back into expressions
   | EFloat Double
   | EString String -- TODO make this smarter
   | EAtom String
@@ -50,7 +53,7 @@ data Value =
   | VString SapString
   | VNil
   | VAtom String
-  | VFunction --FixMe
+  | VFunction ([Value]-> EvalM Value) Arity
   | VPid Pid
   | VObject Object
 
@@ -60,6 +63,20 @@ instance Show Value where
   show (VString st) = show $ bytes st
   show VNil = "nil"
   show (VAtom a) = ':':a
+
+type Arity = (Int,Maybe Int)
+
+checkArity :: Arity -> Int -> Bool
+checkArity (min, Just max) x | (min <= x) && (x <= max) = True
+checkArity (min, Nothing)  x | (min <= x) = True
+checkArity _ _ = False
+
+type EvalM a= StateT Context (ErrorT String IO) a
+
+type Context = M.Map String Value
+
+runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
+runEvalM e c = runErrorT $ runStateT e c
 
 data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} --FixMe
 
