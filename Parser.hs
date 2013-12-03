@@ -41,7 +41,7 @@ block  = do
   let file = filename $ blk
   let result = runParser exprs False file (scanBlock blk) 
   case result of 
-    Left p -> undefined
+    Left p -> parserError p
     Right exps ->  return $ Block exps
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
@@ -141,6 +141,46 @@ transLHS :: Exp -> TParser LHS
 transLHS (EVar v) = return $ LVar v --TODO add indexed, called, and sent here
 transLHS _ = fail "illigal Left Hand Side of assignment expression"
 
+ifParser :: TParser Exp
+ifParser = do
+  let local = do
+        keyword "then"
+        cons <- expr
+        alt  <- optionMaybe (keyword "else" >> expr)
+        return (cons,alt)
+  keyword "if"
+  pred <- expr
+  (cons, alt) <- local <|> ifBlock
+  return $ If pred cons alt
+
+ifBlock = do
+  let tok Token {token = (TBlock b)} = Just b
+      tok _ = Nothing
+  blk <- tokenP tok
+  putState True
+  let file = filename blk
+  let result = runParser ifBlock' False file (scanBlock blk)
+  case result of 
+    Left p  -> parserError p -- TODO Propagate error
+    Right x -> return x
+
+ifBlock' :: TParser (Exp, Maybe Exp)
+ifBlock' = nakedThenBlock <|> thenLine <|> simpleBlock
+  where
+    nakedThenBlock = do
+      cons <- block
+      alt <- elseParse
+      return (cons,alt)
+    thenLine = do
+      cons <- keyword "then" >>  (block <|> termExpr)
+      alt  <- elseParse
+      return (cons, alt)
+    simpleBlock = do
+      exps <- exprs
+      return (Block exps, Nothing)
+    elseParse = optionMaybe (keyword "else" >> (block <|> termExpr))
+
+
 lambda :: TParser Exp
 lambda = do
   let single = do
@@ -181,7 +221,7 @@ expr1 = do
     extend exp = (extension exp >>= extend) <|> return exp
 
 
-statement = lambda
+statement = lambda <|> ifParser
 
 expr = statement <|> expr1
 

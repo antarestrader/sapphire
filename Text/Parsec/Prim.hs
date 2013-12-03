@@ -31,6 +31,7 @@ module Text.Parsec.Prim
     , parserBind
     , mergeErrorReply
     , parserFail
+    , parserError
     , parserZero
     , parserPlus
     , (<?>)
@@ -269,6 +270,10 @@ parserFail :: String -> ParsecT s u m a
 parserFail msg
     = ParsecT $ \s _ _ _ eerr ->
       eerr $ newErrorMessage (Message msg) (statePos s)
+
+parserError err
+     = ParsecT $ \s _ _ _ eerr ->
+     eerr err
 
 instance MonadPlus (ParsecT s u m) where
     mzero = parserZero

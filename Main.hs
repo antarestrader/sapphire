@@ -5,6 +5,7 @@ import System.IO
 import Control.Monad.Error
 import qualified Data.Map as M
 import LineParser
+import Tokens
 import AST
 import Parser
 import Eval
@@ -49,11 +50,23 @@ parserREPL c = do
                mapM_ print exps 
                parserREPL c
 
+tokenREPL :: Context -> IO ()
+tokenREPL c = do
+  l <- prompt
+  case l of
+    "" -> system c
+    _  -> do
+           let toks = scanBlock $ parseCode "Input String" l
+           print toks 
+           tokenREPL c
+
+
 system c = do
   l <- cmdPrompt
   case l of
     "" -> repl c
     "parser" -> parserREPL c
+    "tokens" -> tokenREPL  c
     "quit" -> return ()
     "q" -> return ()
     _ -> putStrLn "Unknown Command." >> system c
