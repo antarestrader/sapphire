@@ -26,12 +26,23 @@ main = do
 repl :: Context -> IO ()
 repl c = do
   l <- prompt
-  result <- runEvalM (evaluate l) c
-  case result of
-    Left  err -> putStrLn ("Error: " ++ err) >> repl c
-    Right (val,c') -> do
-      putStrLn $ show val
-      repl c'
+  case l of
+    "" -> system c
+    _  -> do
+           result <- runEvalM (evaluate l) c
+           case result of
+             Left  err -> putStrLn ("Error: " ++ err) >> repl c
+             Right (val,c') -> do
+               putStrLn $ show val
+               repl c'
+
+system c = do
+  l <- cmdPrompt
+  case l of
+    "" -> repl c
+    "quit" -> return ()
+    "q" -> return ()
+
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of
@@ -42,4 +53,16 @@ prompt :: IO String
 prompt = do
   putStr "Sapphire > "
   hFlush stdout
-  Prelude.getLine
+  getLines ""
+
+cmdPrompt = do
+  putStr "  System > "
+  hFlush stdout
+  Prelude.getLine 
+
+getLines :: String -> IO String
+getLines ls = do 
+  l <- Prelude.getLine
+  case l of
+    "" -> return ls
+    _  -> putStr "         > " >> hFlush stdout >> (getLines $ ls ++ l ++ "\n")
