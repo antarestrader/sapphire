@@ -36,7 +36,22 @@ eval (Apply var argExprs) = do
           "Arity Mismatch on function " ++ show var ++ 
 	  " with " ++ show (length argExprs) ++" arguments."
     Just val -> eval (Call (EValue val) "call" argExprs)
+eval (Lambda params exp) = do
+  c <- get
+  return (VFunction (mkFunct c params exp) (length params, Just $ length params)) -- no varargs for now
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
+
+mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value
+mkFunct c params exp vals = using (merge (zip params vals) c) (eval exp)
+
+using :: Context -> EvalM a -> EvalM a
+using c evalm = do
+  cOld <- get
+  put c
+  resp <- evalm
+  put cOld
+  return resp
+
 
 -- Impliments the Shunting-yard Algorithm
 -- of Edsger Dijstra as described at

@@ -63,6 +63,9 @@ instance Show Value where
   show (VString st) = show $ bytes st
   show VNil = "nil"
   show (VAtom a) = ':':a
+  show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
+  show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
+  show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
 
 type Arity = (Int,Maybe Int)
 
