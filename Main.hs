@@ -58,7 +58,6 @@ system c = do
     "q" -> return ()
     _ -> putStrLn "Unknown Command." >> system c
 
-
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of
    Left p  -> throwError $ show p

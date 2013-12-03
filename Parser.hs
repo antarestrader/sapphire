@@ -11,13 +11,13 @@ import Text.Parsec.Pos
 
 type TParser = Parsec [Token] Bool
 
-emptyPosition _ =  newPos "" 1 1
+position t = newPos (tfile t) (fromIntegral $ tline t) (fromIntegral $ toffset t)
 
 parseString :: String -> Either ParseError [Exp]
 parseString s = runParser exprs False "Input String" $ scanBlock $ parseCode "Input String" s
 
 tokenP :: (Token -> Maybe a) -> TParser a
-tokenP = P.token show emptyPosition
+tokenP = P.token show position
 
 tokenEq :: T -> TParser Token
 tokenEq t = tokenP (\t' -> if t == (token t') then Just t' else Nothing)
