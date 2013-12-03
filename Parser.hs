@@ -1,7 +1,7 @@
 module Parser where
 
 import Tokens
-import LineParser (parseCode)
+import LineParser (parseCode, filename)
 import AST
 import Control.Monad
 import Data.Maybe
@@ -9,12 +9,12 @@ import Text.Parsec hiding (token, string)
 import qualified Text.Parsec as P
 import Text.Parsec.Pos
 
-type TParser = Parsec [Token] ()
+type TParser = Parsec [Token] Bool
 
 emptyPosition _ =  newPos "" 1 1
 
-parseString :: String -> Either ParseError Exp
-parseString s = parse expr "Input String" $ scanBlock $ parseCode "Input String" s
+parseString :: String -> Either ParseError [Exp]
+parseString s = runParser exprs False "Input String" $ scanBlock $ parseCode "Input String" s
 
 tokenP :: (Token -> Maybe a) -> TParser a
 tokenP = P.token show emptyPosition
@@ -31,12 +31,18 @@ tdot   = tokenEq TDot          <?> "'.' (Call)"
 tsend  = tokenEq TSend         <?> "'->' (Send)"
 assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
 nil    = keyword "nil" >> return ENil
+tend   = tokenEq TEnd >> return () <?> "End of Line"
 
 block  = do
   let tok Token {token = (TBlock b)} = Just b
       tok _ = Nothing
   blk <- tokenP tok
-  return $ Block []  --TODO parse codeblock
+  putState True
+  let file = filename $ blk
+  let result = runParser exprs False file (scanBlock blk) 
+  case result of 
+    Left p -> undefined
+    Right exps ->  return $ Block exps
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
 foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)   
@@ -107,12 +113,12 @@ var = do
           v <- identifier
           pscope [v] <|> (return $ Var v [])
     let global = pscope [""]
-    var <- local <|> global
+    var <- local <|> global <?> "variable expression"
     (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
 
 op :: TParser (Op,Exp)
 op = do
-    o <-  tokenP testTok
+    o <-  tokenP testTok <?> "operator symbol"
     e <- expr'
     return(o,e)
   where
@@ -132,13 +138,13 @@ assign lhs' = do
   return $ Assign lhs rhs
 
 transLHS :: Exp -> TParser LHS
-transLHS (EVar v) = return $LVar v --TODO add indexed, called, and sent here
+transLHS (EVar v) = return $ LVar v --TODO add indexed, called, and sent here
 transLHS _ = fail "illigal Left Hand Side of assignment expression"
 
 lambda :: TParser Exp
 lambda = do
   let single = do
-        tsend
+        tsend <?> "End of params marker (->)"
         expr
   keyword "lambda"
   params <- option [] paramList
@@ -146,7 +152,7 @@ lambda = do
   return $ Lambda params exp
   
 indexed exp = do
-  idx <- between bopen bclose expr
+  idx <- between bopen bclose expr <?> "index expression ([...])"
   return $ Index exp idx
 
 called exp = do
@@ -178,6 +184,16 @@ expr1 = do
 statement = lambda
 
 expr = statement <|> expr1
+
+termExpr = (setState False) >> (statement <|> term)
+  where
+    term = do
+      exp <- expr1
+      blk <- getState
+      when (not blk) tend
+      return exp
+
+exprs = many1 termExpr
 
 expr' = statement <|> expr1a
   where

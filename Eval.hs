@@ -39,6 +39,7 @@ eval (Apply var argExprs) = do
 eval (Lambda params exp) = do
   c <- get
   return (VFunction (mkFunct c params exp) (length params, Just $ length params)) -- no varargs for now
+eval (Block exps) = fmap last $ mapM eval exps
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value

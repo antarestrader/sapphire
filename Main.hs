@@ -34,20 +34,35 @@ repl c = do
              Left  err -> putStrLn ("Error: " ++ err) >> repl c
              Right (val,c') -> do
                putStrLn $ show val
-               repl c'
+               repl $ merge [("it", val)] c'
+
+parserREPL :: Context -> IO ()
+parserREPL c = do
+  l <- prompt
+  case l of
+    "" -> system c
+    _  -> do
+           let result = parseString l
+           case result of
+             Left  err -> putStrLn ("Error: " ++ show err) >> parserREPL c
+             Right exps -> do
+               mapM_ print exps 
+               parserREPL c
 
 system c = do
   l <- cmdPrompt
   case l of
     "" -> repl c
+    "parser" -> parserREPL c
     "quit" -> return ()
     "q" -> return ()
+    _ -> putStrLn "Unknown Command." >> system c
 
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of
    Left p  -> throwError $ show p
-   Right e -> eval e
+   Right es -> fmap last $ mapM eval es
 
 prompt :: IO String
 prompt = do

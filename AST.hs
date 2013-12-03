@@ -10,7 +10,7 @@ data Exp =
   | EInt Integer
   | EValue Value -- allows values to be "shoved" values back into expressions
   | EFloat Double
-  | EString String -- TODO make this smarter
+  | EString String
   | EAtom String
   | ENil
   | OpStr Exp [(Op,Exp)]
