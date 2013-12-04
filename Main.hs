@@ -18,8 +18,10 @@ main = do
   let 
      context =M.fromList [
         ("test", VInt 5)
-      , ("add" , VFunction F.add (2,Just 2))
-      , ("+"   , VFunction F.add (2,Just 2))
+      , ("add" , VFunction F.add  (2,Just 2))
+      , ("+"   , VFunction F.add  (2,Just 2))
+      , ("-"   , VFunction F.sub  (2,Just 2))
+      , ("*"   , VFunction F.mult (2,Just 2))
       , ("puts", VFunction F.puts (0,Nothing))
       ]
   repl context
