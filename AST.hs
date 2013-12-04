@@ -12,7 +12,7 @@ data Exp =
   | EFloat Double
   | EString String
   | EAtom String
-  | ENil
+  | ENil | EFalse | ETrue
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp
   | Lambda [String] Exp
@@ -51,17 +51,29 @@ data Value =
     VInt Integer
   | VFloat Double
   | VString SapString
-  | VNil
+  | VNil | VFalse | VTrue
   | VAtom String
   | VFunction ([Value]-> EvalM Value) Arity
   | VPid Pid
   | VObject Object
 
+instance Eq Value where
+  (VInt i) == (VInt j) = i == j
+  (VFloat f) == (VFloat g) = f == g
+  (VString s) == (VString t) = s == t
+  VAtom s == VAtom t = s == t
+  VNil == VNil = True
+  VTrue == VTrue = True
+  VFalse == VFalse = True
+  _ == _ = False
+  
 instance Show Value where
   show (VInt i) = show i
   show (VFloat f) = show f
   show (VString st) = show $ bytes st
   show VNil = "nil"
+  show VTrue = "true"
+  show VFalse = "false"
   show (VAtom a) = ':':a
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
@@ -81,7 +93,7 @@ type Context = M.Map String Value
 runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
 runEvalM e c = runErrorT $ runStateT e c
 
-data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} --FixMe
+data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} deriving Eq --FixMe
 
 type Pid = Integer
 

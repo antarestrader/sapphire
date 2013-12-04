@@ -13,6 +13,8 @@ eval (EValue val) = return val
 eval (EInt i) = return (VInt i)
 eval (EFloat f) = return (VFloat f)
 eval ENil = return VNil
+eval ETrue = return VTrue
+eval EFalse = return VFalse
 eval (EAtom a) = return (VAtom a)
 eval (OpStr a ops) = do
   c <- get
@@ -40,6 +42,12 @@ eval (Lambda params exp) = do
   c <- get
   return (VFunction (mkFunct c params exp) (length params, Just $ length params)) -- no varargs for now
 eval (Block exps) = fmap last $ mapM eval exps
+eval (If pred cons (Just alt)) = do
+  r <- eval pred
+  if r == VNil || r == VFalse then eval alt else eval cons
+eval (If pred cons Nothing) = do
+  r <- eval pred
+  if r == VNil || r == VFalse then return VNil else eval cons
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value

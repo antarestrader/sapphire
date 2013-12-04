@@ -30,7 +30,9 @@ bclose = tokenEq TBracketClose <?> "']'"
 tdot   = tokenEq TDot          <?> "'.' (Call)"
 tsend  = tokenEq TSend         <?> "'->' (Send)"
 assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
-nil    = keyword "nil" >> return ENil
+nil    = keyword "nil"   >> return ENil
+falseP = keyword "false" >> return EFalse
+trueP  = keyword "true"  >> return ETrue 
 tend   = tokenEq TEnd >> return () <?> "End of Line"
 
 block  = do
@@ -208,7 +210,10 @@ sent exp = do
   return $ Send exp s args
 
 expr0 :: TParser Exp
-expr0 = paren <|> nil <|> var <|> atom <|> float <|> int <|> string <?> "basic expression unit"
+expr0 = paren 
+     <|> nil <|> falseP <|> trueP 
+     <|> var <|> atom   <|> float 
+     <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
