@@ -2,6 +2,7 @@ module Eval where
 
 import qualified Data.Map as M
 import AST
+import Object
 import Context
 import Prelude hiding (lookup) 
 import Control.Monad

@@ -2,6 +2,7 @@ module Context where
 
 import qualified Data.Map as M
 import AST
+import Object
 
 emptyContext = M.empty :: Context
 

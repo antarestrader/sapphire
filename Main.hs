@@ -6,6 +6,7 @@ import Control.Monad.Error
 import qualified Data.Map as M
 import LineParser
 import Tokens
+import Object
 import AST
 import Parser
 import Eval

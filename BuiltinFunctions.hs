@@ -2,8 +2,7 @@
 module BuiltinFunctions where
 
 import Control.Monad.Error
-import AST
-import Eval
+import Object
 
 type Fn = [Value] -> EvalM Value
 
@@ -19,6 +18,5 @@ binop op _ = throwError "Arity Error: Add takes 2 arguments"
 add  = binop (+)
 sub  = binop (-)
 mult = binop (*)
-
 
 puts vals = liftIO $ mapM_ print vals >> return VNil
