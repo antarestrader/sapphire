@@ -5,6 +5,8 @@ import qualified Data.Map as M
 import Control.Monad.Error
 import Control.Monad.State
 
+import {-# SOURCE #-} Eval
+
 type Fn = [Value] -> EvalM Value
 
 type Method = Object -> [Value] -> EvalM Value
@@ -72,9 +74,6 @@ data Object = Object { ivars   :: M.Map String Value  -- instance variables
 		                                      -- possibally empty for anonomous classes.
 		     }
 
-data Context = Context {locals :: M.Map String Value, self :: Either Pid Object}
 
-type EvalM a= StateT Context (ErrorT String IO) a
 
-runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
-runEvalM e c = runErrorT $ runStateT e c
+

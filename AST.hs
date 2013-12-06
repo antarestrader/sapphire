@@ -1,6 +1,7 @@
 module AST where
 
 import Object(Value)
+import Var
 
 data Exp = 
     EVar Var 
@@ -26,13 +27,6 @@ data Exp =
   | Class Var (Maybe Var) Exp
   | Module Var Exp
   | Block [Exp]  deriving Show
-
-type Scope = [String]
-
-type Op = String
-
-data Var = Var {name :: String, scope :: Scope} | Self deriving Show 
-  -- TODO: Better Show for Var
 
 data LHS = 
     LVar Var

@@ -4,10 +4,16 @@ import qualified Data.Map as M
 import AST
 import Object
 import Context
+import Var
 import Prelude hiding (lookup) 
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
+
+type EvalM a= StateT Context (ErrorT String IO) a
+
+runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
+runEvalM e c = runErrorT $ runStateT e c
 
 eval :: Exp -> EvalM Value
 eval (EValue val) = return val

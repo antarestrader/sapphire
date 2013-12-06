@@ -1,8 +1,10 @@
 module Context where
 
 import qualified Data.Map as M
-import AST
 import Object
+import Var
+
+data Context = Context {locals :: M.Map String Value, self :: Either Pid Object}
 
 lookup :: Var -> Context -> Maybe Value
 lookup (Var {name=s, scope=[]}) c = M.lookup s (locals c)

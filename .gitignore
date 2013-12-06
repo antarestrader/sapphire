@@ -1,6 +1,8 @@
 Tokens.hs
 Main
 *.o
+*.o-boot
+*.hi-boot
 *.hi
 *.out
 *.exe

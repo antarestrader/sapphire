@@ -3,9 +3,7 @@ module BuiltinFunctions where
 
 import Control.Monad.Error
 import Object
-
-type Fn = [Value] -> EvalM Value
-
+import Eval
 
 binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM Value
 binop op [VFloat a, VFloat b] = return $ VFloat (a `op` b)

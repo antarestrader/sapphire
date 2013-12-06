@@ -3,6 +3,7 @@ module Parser where
 import Tokens
 import LineParser (parseCode, filename)
 import AST
+import Var
 import Control.Monad
 import Data.Maybe
 import Text.Parsec hiding (token, string)
