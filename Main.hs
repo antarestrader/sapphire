@@ -29,7 +29,7 @@ main = do
  
 repl :: Context -> IO ()
 repl c = do
-  l <- prompt
+  l <- prompt "Sapphire"
   case l of
     "" -> system c
     _  -> do
@@ -42,7 +42,7 @@ repl c = do
 
 parserREPL :: Context -> IO ()
 parserREPL c = do
-  l <- prompt
+  l <- prompt "parser"
   case l of
     "" -> system c
     _  -> do
@@ -55,7 +55,7 @@ parserREPL c = do
 
 tokenREPL :: Context -> IO ()
 tokenREPL c = do
-  l <- prompt
+  l <- prompt "tokens"
   case l of
     "" -> system c
     _  -> do
@@ -65,7 +65,7 @@ tokenREPL c = do
 
 
 system c = do
-  l <- cmdPrompt
+  l <- cmdPrompt "System"
   case l of
     "" -> repl c
     "parser" -> parserREPL c
@@ -79,20 +79,22 @@ evaluate str = case parseString str of
    Left p  -> throwError $ show p
    Right es -> fmap last $ mapM eval es
 
-prompt :: IO String
-prompt = do
-  putStr "Sapphire > "
+prompt :: String -> IO String
+prompt l = do
+  let l' = (replicate (9 - length l) ' ') ++ l
+  putStr $ l' ++" > "
   hFlush stdout
   getLines ""
 
-cmdPrompt = do
-  putStr "  System > "
+cmdPrompt l = do
+  let l' = (replicate (9 - length l) ' ') ++ l
+  putStr $ l' ++" > "
   hFlush stdout
-  Prelude.getLine 
+  Prelude.getLine
 
 getLines :: String -> IO String
 getLines ls = do 
   l <- Prelude.getLine
   case l of
     "" -> return ls
-    _  -> putStr "         > " >> hFlush stdout >> (getLines $ ls ++ l ++ "\n")
+    _  -> putStr "          > " >> hFlush stdout >> (getLines $ ls ++ l ++ "\n")
