@@ -1,6 +1,6 @@
 module Object where
 
-import qualified Data.ByteString as B
+import qualified Data.Text as T
 import qualified Data.Map as M
 import Control.Monad.Error
 import Control.Monad.State
@@ -32,7 +32,7 @@ instance Eq Value where
 instance Show Value where
   show (VInt i) = show i
   show (VFloat f) = show f
-  show (VString st) = show $ bytes st
+  show (VString st) = show $ text st
   show VNil = "nil"
   show VTrue = "true"
   show VFalse = "false"
@@ -40,6 +40,9 @@ instance Show Value where
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
+  show (VObject (Object {klass = Right (Class {properName = n})})) = "<Object "++n++">"
+  show (VObject (Object {})) = "<Object>"
+  show (VObject (Class  {properName = n})) = "<Class "++n++">"
 
 type Arity = (Int,Maybe Int)
 
@@ -48,7 +51,7 @@ checkArity (min, Just max) x | (min <= x) && (x <= max) = True
 checkArity (min, Nothing)  x | (min <= x) = True
 checkArity _ _ = False
 
-data SapString = SapString {encoding :: String, esscapes :: [String], bytes :: B.ByteString} deriving Eq --FixMe
+data SapString = SapString {encoding :: String, esscapes :: [String], text :: T.Text } deriving Eq --FixMe
 
 type Pid = Integer
 
@@ -56,9 +59,20 @@ type Precedence = (Int, AssocLR, AssocLR)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
-data Object = Object {ivars :: M.Map String Value, klass :: Pid, methods :: M.Map String Method}
+data Object = Object { ivars   :: M.Map String Value  -- instance variables
+                     , klass   :: Either Pid Object   -- the class of this instance
+		     , modules :: [Either Pid Object] -- included modules `head` shadows `tail` 
+		     }
+            | Class   {ivars   :: M.Map String Value  -- instance variables
+	             , klass   :: Either Pid Object   -- the class of this instance (typicall Class)
+		     , modules :: [Either Pid Object] -- included modules `head` shadows `tail`
+		     , super   :: Either Pid Object   -- the super-class of this class 
+		     , methods :: M.Map String Method -- instance methods
+		     , properName :: String           -- The name in the "global" scope of this class
+		                                      -- possibally empty for anonomous classes.
+		     }
 
-type Context = M.Map String Value
+data Context = Context {locals :: M.Map String Value, self :: Either Pid Object}
 
 type EvalM a= StateT Context (ErrorT String IO) a
 

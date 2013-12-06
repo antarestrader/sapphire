@@ -34,7 +34,9 @@ nil    = keyword "nil"   >> return ENil
 falseP = keyword "false" >> return EFalse
 trueP  = keyword "true"  >> return ETrue 
 tend   = tokenEq TEnd >> return () <?> "End of Line"
+tsuper = tokenEq TSuper         <?> "<-"
 
+block :: TParser Exp
 block  = do
   let tok Token {token = (TBlock b)} = Just b
       tok _ = Nothing
@@ -105,7 +107,7 @@ identifier = tokenP tok
     tok Token {token=TVar v} = Just v
     tok _ = Nothing
 
-var :: TParser Exp
+var :: TParser Var
 var = do 
     let pscope xs = do
           tokenEq TScope
@@ -115,8 +117,10 @@ var = do
           v <- identifier
           pscope [v] <|> (return $ Var v [])
     let global = pscope [""]
-    var <- local <|> global <?> "variable expression"
-    (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
+    local <|> global <?> "variable expression"
+
+args var =
+  (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
 
 op :: TParser (Op,Exp)
 op = do
@@ -182,6 +186,15 @@ ifBlock' = nakedThenBlock <|> thenLine <|> simpleBlock
       return (Block exps, Nothing)
     elseParse = optionMaybe (keyword "else" >> (block <|> termExpr))
 
+classParser :: TParser Exp
+classParser = do
+  keyword "class"
+  n <- var
+  s <- optionMaybe $ tsuper >> var
+  exp <- block <|> expr
+  return $ Class n s exp
+
+
 
 lambda :: TParser Exp
 lambda = do
@@ -212,7 +225,7 @@ sent exp = do
 expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP <|> trueP 
-     <|> var <|> atom   <|> float 
+     <|> (var >>= args)   <|> atom   <|> float 
      <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
@@ -226,7 +239,7 @@ expr1 = do
     extend exp = (extension exp >>= extend) <|> return exp
 
 
-statement = lambda <|> ifParser
+statement = lambda <|> ifParser <|> classParser
 
 expr = statement <|> expr1
 
