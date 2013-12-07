@@ -14,7 +14,8 @@ $digit = 0-9
 $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
-@keywords = if|then|else|elsif|class|module|do|while|until|case|when|end|nil|def|define
+@stringchar = \\\"|[^\"] -- " <- this is here to keep the text formattin intact
+@keywords = if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
 
 tokens :-
 
@@ -39,9 +40,10 @@ tokens :-
   \)                              {\(AlexPn _ _ i) s -> (i, TClose)}
   \[                              {\(AlexPn _ _ i) s -> (i, TBracket)}
   \]                              {\(AlexPn _ _ i) s -> (i, TBracketClose)}
+  $opSym+"="                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ init s)}
   $opSym+                         {\(AlexPn _ _ i) s -> (i, TOperator s)}
-  "="$opSym+                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ tail s)}
   \.                              {\(AlexPn _ _ i) s -> (i, TDot)}
+  \"@stringchar*\"                 {\(AlexPn _ _ i) s -> (i, TString s)}
 {
 
 data T =
@@ -58,24 +60,25 @@ data T =
   TAtom  String    |
   TLabel String    |
   TOperator String |
+  TString String   |
   TEnd             |
   TBlock CodeBlock
     deriving (Eq, Show)
 
-data Token = Token {tline :: LineNo, toffset::Offset, token::T}
+data Token = Token {tfile:: FilePath, tline :: LineNo, toffset::Offset, token::T}
 
 instance Show Token where
   show t = printf "[%s (%i,%i)]" (show $ token t) (tline t) (toffset t)
 
-scanLine :: Line -> [Token]
-scanLine l = (map (\(i,t)->Token (lineNo l) (fromIntegral i) t) $ alexScanTokens (line l ++ "\n")) ++ (cb l)
+scanLine :: FilePath ->Line -> [Token]
+scanLine fp l = (map (\(i,t)->Token fp (lineNo l) (fromIntegral i) t) $ alexScanTokens (line l ++ "\n")) ++ (cb l)
   where
     cb :: Line -> [Token]
-    cb Line {block = Nothing} = [Token (lineNo l) (offset l + fromIntegral (length (line l))) TEnd]
-    cb Line {block = Just bk} = [Token (startLine bk) (indent bk) (TBlock bk)] 
+    cb Line {block = Nothing} = [Token fp (lineNo l) (offset l + fromIntegral (length (line l))) TEnd]
+    cb Line {block = Just bk} = [Token (filename bk) (startLine bk) (indent bk) (TBlock bk)] 
 
 
 scanBlock :: CodeBlock -> [Token]
-scanBlock = concat . map scanLine . lines
+scanBlock cb = concat $ map (scanLine (filename cb)) (lines cb)
 
 }
