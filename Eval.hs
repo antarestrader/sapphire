@@ -3,16 +3,20 @@ module Eval where
 import qualified Data.Map as M
 import AST
 import Object
+import Object.Spawn
 import Context
 import Var
 import Prelude hiding (lookup) 
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
+import Control.Concurrent.Chan
 
-type EvalM a= StateT Context (ErrorT String IO) a
+type Err = String
 
-runEvalM :: (EvalM a) -> Context -> IO (Either String (a, Context))
+type EvalM a= StateT Context (ErrorT Err IO) a
+
+runEvalM :: (EvalM a) -> Context -> IO (Either Err (a, Context))
 runEvalM e c = runErrorT $ runStateT e c
 
 eval :: Exp -> EvalM Value
@@ -55,6 +59,20 @@ eval (If pred cons (Just alt)) = do
 eval (If pred cons Nothing) = do
   r <- eval pred
   if r == VNil || r == VFalse then return VNil else eval cons
+eval (EClass n Nothing exp) = do
+  -- TODO: get Object and store new class
+  let cls = 
+        VObject Class 
+          { ivars = M.empty
+	  , klass = undefined
+	  , modules=[]
+	  , super = undefined
+	  , cvars = M.empty
+	  , properName = name n
+	  }
+  pid <- liftIO $ spawn cls
+  liftIO $ writeChan (channel pid) $ Eval exp
+  return cls			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value
