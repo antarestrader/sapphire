@@ -193,7 +193,7 @@ classParser = do
   n <- var
   s <- optionMaybe $ tsuper >> var
   exp <- block <|> expr
-  return $ Class n s exp
+  return $ EClass n s exp
 
 
 

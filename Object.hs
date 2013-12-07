@@ -4,12 +4,15 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import Control.Monad.Error
 import Control.Monad.State
+import Control.Concurrent
+import Control.Concurrent.MVar --may want strict
+import Control.Concurrent.Chan --may want strict
 
 import {-# SOURCE #-} Eval
+import {-# SOURCE #-} AST
+import Var
 
 type Fn = [Value] -> EvalM Value
-
-type Method = Object -> [Value] -> EvalM Value
 
 data Value =
     VInt Integer
@@ -19,7 +22,8 @@ data Value =
   | VAtom String
   | VFunction Fn Arity
   | VPid Pid
-  | VObject Object
+  | VObject Object -- may want to make this stric in Object
+  | VError Err
 
 instance Eq Value where
   (VInt i) == (VInt j) = i == j
@@ -55,8 +59,6 @@ checkArity _ _ = False
 
 data SapString = SapString {encoding :: String, esscapes :: [String], text :: T.Text } deriving Eq --FixMe
 
-type Pid = Integer
-
 type Precedence = (Int, AssocLR, AssocLR)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
@@ -69,11 +71,16 @@ data Object = Object { ivars   :: M.Map String Value  -- instance variables
 	             , klass   :: Either Pid Object   -- the class of this instance (typicall Class)
 		     , modules :: [Either Pid Object] -- included modules `head` shadows `tail`
 		     , super   :: Either Pid Object   -- the super-class of this class 
-		     , methods :: M.Map String Method -- instance methods
+		     , cvars :: M.Map String Value     -- instance methods
 		     , properName :: String           -- The name in the "global" scope of this class
 		                                      -- possibally empty for anonomous classes.
 		     }
 
+data Pid = Pid {channel :: (Chan Message), thread :: ThreadId}
 
-
+data Message =
+    Execute Var [Value] (MVar Value) --may want ot make this strict in value
+  | Retrieve Var (MVar (Maybe Value))
+  | Eval Exp
+  | Terminate
 

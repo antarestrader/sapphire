@@ -1,13 +1,19 @@
 module Context where
 
 import qualified Data.Map as M
+import Control.Monad
+import Control.Concurrent.MVar
 import Object
 import Var
 
-data Context = Context {locals :: M.Map String Value, self :: Either Pid Object}
+data Context = Context 
+               {locals :: M.Map String Value
+               , self :: Either Pid Object
+               , continuation :: MVar Value
+               }
 
 lookup :: Var -> Context -> Maybe Value
-lookup (Var {name=s, scope=[]}) c = M.lookup s (locals c)
+lookup (Var {name=s, scope=[]}) c = M.lookup s (locals c) 
 lookup _ _ = Nothing
 
 insert :: Var -> Value -> Context -> Context

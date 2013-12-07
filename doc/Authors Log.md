@@ -86,3 +86,20 @@ those that exist outside the control of the Sapphire environment (e.g. read a
 file). It is even possible to stretch this a little and allow Value Pure
 function to close over local variables from the context in which they were
 created. What they may not do is touch `self`.
+
+## December 7, 2013 at 12:09 am
+
+I began implementing Objects today (yesterday by 9 minutes).  The issue I have
+run into is how to handle the "global" namespace for classes. When a class is
+created by say `class Foo` the expectation is that we can then ask for a new
+instance with `Foo.new` and it will be found in most contexts.
+
+In ruby, this is handled by making the class namespace global.  Global names
+spaces are more difficult in Sapphire because it destroys threading.  My thought
+at the moment is to leverage the RTS by having it call a method in the current
+context something like `install_class "Foo" <class Foo>`.  This may also be the
+way to deal with classes with no default super-class -- ask for "Object" in the
+current context or possibly `get_default_base_class`.
+
+The next hard step is to define functions to walk through the object graph and
+find values by name.  

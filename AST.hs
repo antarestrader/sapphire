@@ -24,7 +24,7 @@ data Exp =
   | If {predicate :: Exp,consequent :: Exp ,alternate :: Maybe Exp}
   | While Exp Exp
   | Until Exp Exp
-  | Class Var (Maybe Var) Exp
+  | EClass Var (Maybe Var) Exp
   | Module Var Exp
   | Block [Exp]  deriving Show
 
