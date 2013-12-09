@@ -68,7 +68,7 @@ keep closures from ruining the concurrency model. Another is how to effectively
 find and call methods.
 
 In particular should methods be separated into their own category as a value, or
-should they just be functions whose first parameter must be self? 
+should they just be functions whose first parameter must be self?
 
 This is all tied in with the question of how Context will work as well. The
 concurrency model depends on the fact that every value in Sapphire belongs to an
@@ -102,4 +102,86 @@ way to deal with classes with no default super-class -- ask for "Object" in the
 current context or possibly `get_default_base_class`.
 
 The next hard step is to define functions to walk through the object graph and
-find values by name.  
+find values by name.
+
+## December 9, 2013 at 9:52am
+
+### The Object Graph
+
+The object graph consists of three types of elements: Simple objects which are
+leaves on the graph, with no incoming connections and only an outgoing
+connection to a single class, Class objects which have a super-class edge as
+well as in instance edge (nominally to the class `Class`) and my have many
+incoming instance nodes and many included modules, and modules which may have a
+super class and be included in other objects.
+
+There is also a single ROOT object which is the superclass of exactly one Class
+(nominally `Object`).
+
+An un-scoped identifier is found by a search up the object graph in the following
+order:
+
+  1 The local scope which shadows everything.
+  2 The instance variables of `self` in the context
+  3 The modules included in `self` (elided in initial implementation)
+  4 The class variables of `self`s class
+  5 The class variables of the super-classes of the above class
+  6 When ROOT is encountered in the search the identifier is not in scope
+
+One issue is that it may take many called and context switches to find a single
+function or variable.  A process of freezing frequently used, but not typically
+altered classes so that their methods can be cached is a planned optimization.
+
+It is still unclear to me if distinguishing `ivars` form `cvars` is the right
+choice. My gut instinct is that it is, so my initial attempt will include the
+separation, but I may find I like a more JavaScript like unification better.
+
+Also not yet included in this model are visibility rules.
+
+### Proposed default graph
+
+`Object`:  The base object form which all other are derived
+           also the default super class
+  klass:   Class
+  super:   ROOT  (later implementations may acquire Ruby's BasicObject.)
+  modules: Kernel
+
+`Class`: The class of which all classes are instances
+  klass: Class
+  super: Object
+
+`main`: the initial context
+  klass: Object
+
+`Kernel`: The module that holds all the built-in functionality of Sapphire
+  klass: Module
+
+Some example:
+
+`foo.bar` where `foo` is an instance of `FooClass<-Object`:
+
+  * send foo "bar" -- foo becomes the context
+  * check ivars of foo for "bar" (2)
+  * move to foo's class FooClass and check cvars for bar (4)
+  * move to FooClass's super class Object and check cvars for "bar" (5)
+  * find that Object's super class is ROOT and abandon search.
+
+`puts "hello world"` in the `main` context
+
+  * check local variables for "puts" (1)
+  * check main's ivars for "puts" (2)
+  * move to main's class Object and look for puts in cvars (3)
+    (success)
+
+`FooClass.new` in `main context
+
+  * Find FooClass
+    * check local variables for "FooClass" (1)
+    * check ivars of main for "FooClass" (2)
+    * move to main's class Object and look for puts in cvars (3)
+      success
+  * send "new" to FooClass -- "FooClass" becomes context
+    * check ivars of FooClass for new (2)
+    * move to FooClass's class Class and check cvars for "New"
+      success
+

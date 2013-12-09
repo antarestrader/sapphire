@@ -1,6 +1,7 @@
 module Object.Spawn where
 
 import Object
+import Object.Graph
 import {-# SOURCE #-} Eval
 import AST
 import Var
@@ -10,8 +11,8 @@ import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 
-spawn :: Value -> IO Pid
-spawn (VPid p) = return p
+spawn :: Value -> IO Object
+spawn (VObject obj@(Pid {})) = return obj
 spawn (VObject obj) = do
   chan <- newChan
   tid  <- forkIO (respond chan obj)
@@ -27,8 +28,10 @@ respond chan obj = do
   case msg of
     Terminate -> return ()
     Eval exp  -> evaluate exp obj >>= respond chan
-    Retrieve var cont -> getValue' obj var cont >> respond chan obj 
-    Execute var args cont -> call obj var args cont >>= respond chan
+    Search      var cont -> search var obj cont >> respond chan obj
+    SearchClass var cont -> search' var obj cont >> respond chan obj
+    Retrieve    var cont -> retrieve var obj cont >> respond chan obj
+    Execute     var args cont -> call obj var args cont >>= respond chan
 
 respondPrim chan obj = do
   msg <- readChan chan
@@ -39,20 +42,19 @@ respondPrim chan obj = do
 evaluate :: Exp -> Object -> IO Object
 evaluate exp obj = do
   c <- newEmptyMVar
-  let context = Context {locals = M.empty, self = Right obj, continuation = c}
+  let context = Context {locals = M.empty, self = obj, continuation = c}
   result <- runEvalM (eval exp) context
   case result of 
     Left  err -> fail err
-    Right (_,Context {self = Right obj'}) -> return obj'
+    Right (_,Context {self = obj'}) -> return obj'
 
 call :: Object -> Var -> [Value] -> (MVar Value) -> IO Object
 call obj var args cont = do
   method <- getMethod obj var
-  let context = Context {locals = M.empty, self = Right obj, continuation = cont}
+  let context = Context {locals = M.empty, self = obj, continuation = cont}
   result <- runEvalM (method args) context
   case result of
     Left  err -> tryPutMVar cont (VError err) >> return obj
-    Right (val,Context{self=Right obj'}) -> tryPutMVar cont val >> return obj' 
+    Right (val,Context{self=obj'}) -> tryPutMVar cont val >> return obj' 
 
 getMethod = undefined
-getValue' = undefined

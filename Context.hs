@@ -4,17 +4,23 @@ import qualified Data.Map as M
 import Control.Monad
 import Control.Concurrent.MVar
 import Object
+import Object.Graph
 import Var
 
 data Context = Context 
                {locals :: M.Map String Value
-               , self :: Either Pid Object
+               , self :: Object
                , continuation :: MVar Value
                }
 
-lookup :: Var -> Context -> Maybe Value
-lookup (Var {name=s, scope=[]}) c = M.lookup s (locals c) 
-lookup _ _ = Nothing
+lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
+lookup var c = 
+  case  M.lookup (top var) (locals c) of
+    Nothing  -> cps $ search var (self c)
+    Just val -> 
+      case bottom var of 
+        Nothing -> return $ Just val
+	Just var' -> valToObj val >>= cps . search var'  
 
 insert :: Var -> Value -> Context -> Context
 insert (Var {name=s, scope=[]}) val c@Context {locals=l} =

@@ -21,7 +21,6 @@ data Value =
   | VNil | VFalse | VTrue
   | VAtom String
   | VFunction Fn Arity
-  | VPid Pid
   | VObject Object -- may want to make this stric in Object
   | VError Err
 
@@ -46,7 +45,7 @@ instance Show Value where
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
-  show (VObject (Object {klass = Right (Class {properName = n})})) = "<Object "++n++">"
+  show (VObject (Object {klass = Class {properName = n}})) = "<Object "++n++">"
   show (VObject (Object {})) = "<Object>"
   show (VObject (Class  {properName = n})) = "<Class "++n++">"
 
@@ -63,24 +62,36 @@ type Precedence = (Int, AssocLR, AssocLR)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
-data Object = Object { ivars   :: M.Map String Value  -- instance variables
-                     , klass   :: Either Pid Object   -- the class of this instance
-		     , modules :: [Either Pid Object] -- included modules `head` shadows `tail` 
+data Object = Pid {channel :: (Chan Message), thread :: ThreadId}
+            | Object { ivars   :: M.Map String Value  -- instance variables
+                     , klass   :: Object   -- the class of this instance
+		     , modules :: [Object] -- included modules `head` shadows `tail` 
 		     }
             | Class   {ivars   :: M.Map String Value  -- instance variables
-	             , klass   :: Either Pid Object   -- the class of this instance (typicall Class)
-		     , modules :: [Either Pid Object] -- included modules `head` shadows `tail`
-		     , super   :: Either Pid Object   -- the super-class of this class 
+	             , klass   :: Object   -- the class of this instance (typicall Class)
+		     , modules :: [Object] -- included modules `head` shadows `tail`
+		     , super   :: Object   -- the super-class of this class 
 		     , cvars :: M.Map String Value     -- instance methods
 		     , properName :: String           -- The name in the "global" scope of this class
 		                                      -- possibally empty for anonomous classes.
 		     }
-
-data Pid = Pid {channel :: (Chan Message), thread :: ThreadId}
+            | ROOT
 
 data Message =
     Execute Var [Value] (MVar Value) --may want ot make this strict in value
-  | Retrieve Var (MVar (Maybe Value))
+  | Search Var  (MVar (Maybe Value)) -- check only ivars more to klass w/ search
+  | SearchClass Var (MVar (Maybe Value)) -- check only cvars move to super class
+  | Retrieve Var (MVar (Maybe Value)) -- when scopped, look only in ivars no graph search
   | Eval Exp
   | Terminate
 
+
+cps :: (MVar a -> IO ()) -> IO a
+cps f = do
+  r <- newEmptyMVar
+  f r
+  readMVar r
+
+valToObj :: Value -> IO Object
+valToObj (VObject obj) = return obj
+valToObj _ = fail "Primitive to Object maping not implimented yet"

@@ -1,7 +1,6 @@
 module Object where
 
 data Message
-data Pid
 data Object
 data AssocLR
 type Precedence = (Int, AssocLR, AssocLR)

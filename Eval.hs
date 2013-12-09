@@ -31,7 +31,7 @@ eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
 eval (EVar var) = do
-  val' <- gets (lookup var)
+  val' <- get >>= (liftIO . lookup var)
   case val' of
     Just val -> return val
     Nothing  -> throwError $ "Not in scope: " ++ (show var)
@@ -40,7 +40,7 @@ eval (Assign (LVar var) exp) = do
   modify (insert var val)
   return val
 eval (Apply var argExprs) = do
-  fn <- gets (lookup var)
+  fn <- get >>= (liftIO . lookup var)
   case fn of
     Nothing -> throwError $ "Not in scope: " ++ (show var)
     Just (VFunction f arity) -> if checkArity arity (length argExprs) 
