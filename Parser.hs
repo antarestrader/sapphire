@@ -34,6 +34,7 @@ assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
 nil    = keyword "nil"   >> return ENil
 falseP = keyword "false" >> return EFalse
 trueP  = keyword "true"  >> return ETrue 
+selfP  = keyword "self"  >> return Self <?> "self"
 tend   = tokenEq TEnd >> return () <?> "End of Line"
 tsuper = tokenEq TSuper         <?> "<-"
 
@@ -118,7 +119,7 @@ var = do
           v <- identifier
           pscope [v] <|> (return $ Var v [])
     let global = pscope [""]
-    local <|> global <?> "variable expression"
+    selfP <|> local <|> global <?> "variable expression"
 
 args var =
   (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)

@@ -10,17 +10,23 @@ import Data.Map as M
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
+import Data.Maybe
 
 spawn :: Value -> IO Object
 spawn (VObject obj@(Pid {})) = return obj
+spawn (VObject obj) | isJust (process obj) = return $ fromJust $ process obj
 spawn (VObject obj) = do
   chan <- newChan
-  tid  <- forkIO (respond chan obj)
+  tid  <- forkIO (initialize chan obj)
   return $ Pid chan tid
 spawn v = do
   chan <- newChan
   tid  <- forkIO (respondPrim chan v)
   return $ Pid chan tid
+
+initialize chan obj = do
+  tid <- myThreadId
+  respond chan obj{process = Just (Pid chan tid)}
 
 respond :: Chan Message -> Object -> IO ()
 respond chan obj = do

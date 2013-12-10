@@ -14,6 +14,7 @@ data Context = Context
                }
 
 lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
+lookup Self c = return $ Just $ VObject $ self c
 lookup var c = 
   case  M.lookup (top var) (locals c) of
     Nothing  -> cps $ search var (self c)

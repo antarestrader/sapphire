@@ -14,9 +14,10 @@ import qualified BuiltinFunctions as F
 boot :: IO Object
 boot = do
   object <- spawn $ VObject Class{
-        ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
+        ivars = M.fromList [("setClass",VFunction F.setClass (1,Just 1))],
         klass = ROOT,
         modules = [],
+	process = Nothing,
         super = ROOT,
         cvars = bootstrapset,
         properName = "Object"}
@@ -24,17 +25,16 @@ boot = do
         ivars = M.empty,
 	klass = object,
 	modules = [],
+	process = Nothing,
 	super = object,
 	cvars = M.empty,
 	properName = "Class"}
   cont <- newEmptyMVar
   writeChan (channel object) (Execute Var{name="setClass", scope=[]} [VObject cls] cont)
-  return $ Object {ivars = M.empty, modules=[], klass = object}
-
-setClass [VObject cls] = do
-  slf <- gets self
-  modify (\c -> c{self=slf{klass=cls}})
-  return VNil
+  -- FIXME: circular call structure is causing deadlock
+  -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object] cont)
+  -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Class", VObject cls] cont)
+  return $ Object {ivars = M.empty, modules=[], klass = object, process=Nothing}
 
 bootstrapset = M.fromList [
          ("test", VInt 5)
@@ -43,4 +43,6 @@ bootstrapset = M.fromList [
        , ("-"   , VFunction F.sub  (2,Just 2))
        , ("*"   , VFunction F.mult (2,Just 2))
        , ("puts", VFunction F.puts (0,Nothing))
+       , ("cls" , VFunction F.cls  (0, Just 0))
+       , ("setCVar" , VFunction F.setCVar  (2, Just 2))
        ]

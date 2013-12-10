@@ -66,6 +66,7 @@ eval (EClass n Nothing exp) = do
           { ivars = M.empty
 	  , klass = undefined
 	  , modules=[]
+	  , process = Nothing
 	  , super = undefined
 	  , cvars = M.empty
 	  , properName = name n

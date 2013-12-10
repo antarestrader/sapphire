@@ -15,7 +15,7 @@ $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
 @stringchar = \\\"|[^\"] -- " <- this is here to keep the text formattin intact
-@keywords = if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
+@keywords = self|if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
 
 tokens :-
 

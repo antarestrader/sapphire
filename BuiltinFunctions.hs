@@ -2,8 +2,11 @@
 module BuiltinFunctions where
 
 import Control.Monad.Error
+import Control.Monad.State
+import qualified Data.Map as M
 import Object
 import Eval
+import Context
 
 binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM Value
 binop op [VFloat a, VFloat b] = return $ VFloat (a `op` b)
@@ -18,3 +21,15 @@ sub  = binop (-)
 mult = binop (*)
 
 puts vals = liftIO $ mapM_ print vals >> return VNil
+
+cls [] = gets (klass . self) >>= (return . VObject)
+
+setClass [VObject cls] = do
+  slf <- gets self
+  modify (\c -> c{self=slf{klass=cls}})
+  return VNil
+
+setCVar [VAtom n,val] = do
+  slf <- gets self
+  modify (\c -> c{self=slf{cvars = M.insert n val (cvars slf)}})
+  return val

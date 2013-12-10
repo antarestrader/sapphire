@@ -47,6 +47,7 @@ instance Show Value where
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
   show (VObject (Object {klass = Class {properName = n}})) = "<Object "++n++">"
   show (VObject (Object {})) = "<Object>"
+  show (VObject (Pid {thread = t})) = "<PID "++ show t ++">"
   show (VObject (Class  {properName = n})) = "<Class "++n++">"
 
 type Arity = (Int,Maybe Int)
@@ -65,11 +66,13 @@ data AssocLR = L | R | N deriving (Show,Eq,Ord)
 data Object = Pid {channel :: (Chan Message), thread :: ThreadId}
             | Object { ivars   :: M.Map String Value  -- instance variables
                      , klass   :: Object   -- the class of this instance
-		     , modules :: [Object] -- included modules `head` shadows `tail` 
+		     , modules :: [Object] -- included modules `head` shadows `tail`
+		     , process :: Maybe Object -- must be a PID pointing to this object 
 		     }
             | Class   {ivars   :: M.Map String Value  -- instance variables
 	             , klass   :: Object   -- the class of this instance (typicall Class)
 		     , modules :: [Object] -- included modules `head` shadows `tail`
+		     , process :: Maybe Object -- must be a PID pointing to this object
 		     , super   :: Object   -- the super-class of this class 
 		     , cvars :: M.Map String Value     -- instance methods
 		     , properName :: String           -- The name in the "global" scope of this class
