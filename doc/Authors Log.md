@@ -185,3 +185,10 @@ Some example:
     * move to FooClass's class Class and check cvars for "New"
       success
 
+## December 9, 2013 at 3:37pm
+## Thoughts on PID in Object Data Structure
+
+I've put PID's into the Object Data Structure. Almost everywhere that I wanted
+an Object I actually wanted Either Pid Object. I am pretty certain that there
+will be a few corner cases where I will want to have a real object and not just
+a reference, but I think I can code around those.

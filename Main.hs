@@ -11,20 +11,12 @@ import AST
 import Parser
 import Eval
 import Context
-import qualified BuiltinFunctions as F
+import Boot(boot)
 
 main :: IO ()
 main = do
-  let 
-     l =M.fromList [
-         ("test", VInt 5)
-       , ("add" , VFunction F.add  (2,Just 2))
-       , ("+"   , VFunction F.add  (2,Just 2))
-       , ("-"   , VFunction F.sub  (2,Just 2))
-       , ("*"   , VFunction F.mult (2,Just 2))
-       , ("puts", VFunction F.puts (0,Nothing))
-       ]
-     context = Context {locals = l}
+  main <- boot
+  let context = Context {locals = M.empty, self=main, continuation = undefined}
   repl context
  
 repl :: Context -> IO ()

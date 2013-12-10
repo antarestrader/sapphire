@@ -57,4 +57,10 @@ call obj var args cont = do
     Left  err -> tryPutMVar cont (VError err) >> return obj
     Right (val,Context{self=obj'}) -> tryPutMVar cont val >> return obj' 
 
-getMethod = undefined
+getMethod obj var = do
+  val <- cps $ search var obj
+  case val of
+    Just (VFunction fn _) -> return fn
+    Just _ -> fail "Function casting not yet implimented"
+    Nothing -> fail "method not in scope"
+
