@@ -93,7 +93,7 @@ cps :: (MVar a -> IO ()) -> IO a
 cps f = do
   r <- newEmptyMVar
   f r
-  readMVar r
+  readMVar r -- this causes deadlocks.
 
 valToObj :: Value -> IO Object
 valToObj (VObject obj) = return obj

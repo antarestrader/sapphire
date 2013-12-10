@@ -64,7 +64,7 @@ call obj var args cont = do
     Right (val,Context{self=obj'}) -> tryPutMVar cont val >> return obj' 
 
 getMethod obj var = do
-  val <- cps $ search var obj
+  val <- cps $ search var obj -- this causes dead-lock if search loops around
   case val of
     Just (VFunction fn _) -> return fn
     Just _ -> fail "Function casting not yet implimented"

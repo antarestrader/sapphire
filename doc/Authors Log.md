@@ -192,3 +192,35 @@ I've put PID's into the Object Data Structure. Almost everywhere that I wanted
 an Object I actually wanted Either Pid Object. I am pretty certain that there
 will be a few corner cases where I will want to have a real object and not just
 a reference, but I think I can code around those.
+
+## December 10, 2013 at 9:04
+
+Last night I encountered what I believe will be the first of many dead-lock and
+race condition errors. Fortunately, this particular deadlock was extremely
+consistent, and I have already identified the source of the problem.
+
+When a Pid receives a call message, it must first find the method by searching
+the object graph.  Because the top of the object graph is designed to loop back
+through itself, it is possible for Object to be blocked waiting for a method
+that is currently held in its cvars.  There are a number of ways to work around
+the immediate problem.  One is to add a `Modify` message that solves allows me
+to do what I need without using a call, another is to move the `setCVar` method to
+a place before the loop occurs.  However the underlying problem of Pids looping
+back on themselves is a fundamental problem that need to be solved.
+
+I believe the solution is to respawn a new message response queue with its own
+Chan, but the same tid and pass this along with any any time a Pid will block
+waiting for a response (see function cps in object for prime example). A Pid
+receiving such a message is then obligated to use this new channel in preference
+to any others with the same tid, as they will be blocked waiting for a response.
+
+In fact sense many Pids could block on the same call chain, this will need to be
+some kind of list of shadowed Pids. This could be a performance bottleneck.
+
+There is also now the issue of needing the response and the message queue to
+both wake up the thread. Some possibilities here are a modified type of Chan, or
+perhaps more likely the `orElse` combinator of the STM library. The need to
+constantly use `atomically` was a good reason to try to avoid the added
+complexity of STM, but faced with the present reality, it may add less
+complexity, and be cleaner then a solution that only uses MVars.  Some
+experimentation will be necessary.
