@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Object.Spawn where
 
 import Object
@@ -10,6 +12,7 @@ import Data.Map as M
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
+import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 spawn :: Value -> IO Object
 spawn (VObject obj@(Pid {})) = return obj
@@ -25,11 +28,20 @@ spawn v = do
 
 initialize chan obj = do
   tid <- myThreadId
-  respond chan obj{process = Just (Pid chan tid)}
+  err <- try $ respond chan obj{process = Just (Pid chan tid)}
+  case err of
+    Right _ -> return ()
+    Left (e:: BlockedIndefinitelyOnSTM) -> putStrLn $ "STM Blocked " ++ show tid
 
 respond :: TChan Message -> Object -> IO ()
 respond chan obj = do
-  msg <- atomically $ readTChan chan
+  msg' <- try $ atomically $ readTChan chan
+  msg <- case msg' of
+    Right m -> return m
+    Left (e:: BlockedIndefinitelyOnSTM) -> do
+      tid <- myThreadId
+      putStrLn $ "STM Blocked reading message " ++ show tid
+      fail "dieing"
   case msg of
     Terminate -> return ()
     Eval exp  -> evaluate exp obj >>= respond chan
@@ -55,7 +67,11 @@ evaluate exp obj = do
 
 call :: Object -> Var -> [Value] -> (TMVar Value) -> IO Object
 call obj var args cont = do
-  method <- atomically $ getMethod obj var
+  method <- do 
+    r <- try $ getMethod obj var
+    case r of
+      Right m -> return m
+      Left (e:: BlockedIndefinitelyOnSTM) -> fail $ "STM Blocked getting method" ++ show var
   let context = Context {locals = M.empty, self = obj, continuation = cont}
   result <- runEvalM (method args) context
   case result of

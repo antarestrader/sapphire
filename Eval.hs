@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Eval where
 
 import qualified Data.Map as M
@@ -12,13 +14,18 @@ import Control.Monad.Error
 import Control.Monad.State
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
+import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 type Err = String
 
 type EvalM a= StateT Context (ErrorT Err IO) a
 
 runEvalM :: (EvalM a) -> Context -> IO (Either Err (a, Context))
-runEvalM e c = runErrorT $ runStateT e c
+runEvalM e c = do
+  r <- try $ runErrorT $ runStateT e c
+  case r of 
+    Right x -> return x
+    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
 
 eval :: Exp -> EvalM Value
 eval (EValue val) = return val
@@ -32,7 +39,7 @@ eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
 eval (EVar var) = do
-  val' <- get >>= (liftIO . atomically . lookup var)
+  val' <- get >>= (liftIO . lookup var)
   case val' of
     Just val -> return val
     Nothing  -> throwError $ "Not in scope: " ++ (show var)
@@ -41,7 +48,7 @@ eval (Assign (LVar var) exp) = do
   modify (insert var val)
   return val
 eval (Apply var argExprs) = do
-  fn <- get >>= (liftIO . atomically . lookup var)
+  fn <- get >>= (liftIO  . lookup var)
   case fn of
     Nothing -> throwError $ "Not in scope: " ++ (show var)
     Just (VFunction f arity) -> if checkArity arity (length argExprs) 

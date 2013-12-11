@@ -90,11 +90,11 @@ data Message =
   | Terminate
 
 
-cps :: (TMVar a -> STM ()) -> STM a
+cps :: (TMVar a -> STM ()) -> IO a
 cps f = do
-  r <- newEmptyTMVar
-  f r
-  readTMVar r -- this causes deadlocks.
+  r <- newEmptyTMVarIO
+  atomically $ f r
+  atomically $ readTMVar r -- this causes deadlocks.
 
 valToObj :: Value -> STM Object
 valToObj (VObject obj) = return obj

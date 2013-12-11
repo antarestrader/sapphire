@@ -22,6 +22,7 @@ boot = do
         super = ROOT,
         cvars = bootstrapset,
         properName = "Object"}
+  putStrLn $ "Object is "++ show (thread object)
   cls <- spawn $ VObject Class{
         ivars = M.empty,
 	klass = object,
@@ -30,17 +31,17 @@ boot = do
 	super = object,
 	cvars = M.empty,
 	properName = "Class"}
+  putStrLn $ "Class is "++ show (thread cls)
   atomically $ do
     cont <- newEmptyTMVar
     writeTChan (channel object) (Execute Var{name="setClass", scope=[]} [VObject cls] cont)
     -- FIXME: circular call structure is causing deadlock
     -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object] cont)
     -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Class", VObject cls] cont)
-  return $ Object {ivars = M.empty, modules=[], klass = object, process=Nothing}
+  return $ Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
 
 bootstrapset = M.fromList [
-         ("test", VInt 5)
-       , ("add" , VFunction F.add  (2,Just 2))
+         ("add" , VFunction F.add  (2,Just 2))
        , ("+"   , VFunction F.add  (2,Just 2))
        , ("-"   , VFunction F.sub  (2,Just 2))
        , ("*"   , VFunction F.mult (2,Just 2))

@@ -12,7 +12,7 @@ search var Pid{channel = chan} cont =  writeTChan chan (Search var cont)
 search _ ROOT _ = fail "Encountered the ROOT of the object graph unexpectedly"
 search var obj  cont =
   case M.lookup (top var) (ivars obj) of 
-    Nothing  -> search' var (klass obj) cont -- TODO look in modules
+    Nothing  ->search' var (klass obj) cont -- TODO look in modules
     Just val -> 
       case (bottom var) of
         Nothing -> putTMVar cont (Just val)
@@ -23,7 +23,7 @@ search' _ ROOT cont = putTMVar cont Nothing --lookup failed
 search' var obj cont = 
   case M.lookup (top var) (cvars obj) of
     Just val -> putTMVar cont (Just val)
-    Nothing   -> search' var (super obj) cont -- TODO look in modules
+    Nothing   -> putTMVar cont Nothing --search' var (super obj) cont -- TODO look in modules
 
 retrieve var Pid{channel = chan} cont = writeTChan chan (Retrieve var cont)
 retrieve var obj cont = 

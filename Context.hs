@@ -13,7 +13,7 @@ data Context = Context
                , continuation :: TMVar Value
                }
 
-lookup :: Var -> Context -> STM (Maybe Value) --Check Local context
+lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
 lookup Self c = return $ Just $ VObject $ self c
 lookup var c = 
   case  M.lookup (top var) (locals c) of
@@ -21,7 +21,7 @@ lookup var c =
     Just val -> 
       case bottom var of 
         Nothing -> return $ Just val
-	Just var' -> valToObj val >>= cps . search var'  
+	Just var' -> (atomically $ valToObj val) >>= cps . search var'  
 
 insert :: Var -> Value -> Context -> Context
 insert (Var {name=s, scope=[]}) val c@Context {locals=l} =
