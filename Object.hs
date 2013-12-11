@@ -5,8 +5,9 @@ import qualified Data.Map as M
 import Control.Monad.Error
 import Control.Monad.State
 import Control.Concurrent
-import Control.Concurrent.MVar --may want strict
-import Control.Concurrent.Chan --may want strict
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TMVar 
+import Control.Concurrent.STM.TChan 
 
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
@@ -63,7 +64,7 @@ type Precedence = (Int, AssocLR, AssocLR)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
-data Object = Pid {channel :: (Chan Message), thread :: ThreadId}
+data Object = Pid {channel :: (TChan Message), thread :: ThreadId}
             | Object { ivars   :: M.Map String Value  -- instance variables
                      , klass   :: Object   -- the class of this instance
 		     , modules :: [Object] -- included modules `head` shadows `tail`
@@ -81,20 +82,20 @@ data Object = Pid {channel :: (Chan Message), thread :: ThreadId}
             | ROOT
 
 data Message =
-    Execute Var [Value] (MVar Value) --may want ot make this strict in value
-  | Search Var  (MVar (Maybe Value)) -- check only ivars more to klass w/ search
-  | SearchClass Var (MVar (Maybe Value)) -- check only cvars move to super class
-  | Retrieve Var (MVar (Maybe Value)) -- when scopped, look only in ivars no graph search
+    Execute Var [Value] (TMVar Value) --may want ot make this strict in value
+  | Search Var  (TMVar (Maybe Value)) -- check only ivars more to klass w/ search
+  | SearchClass Var (TMVar (Maybe Value)) -- check only cvars move to super class
+  | Retrieve Var (TMVar (Maybe Value)) -- when scopped, look only in ivars no graph search
   | Eval Exp
   | Terminate
 
 
-cps :: (MVar a -> IO ()) -> IO a
+cps :: (TMVar a -> STM ()) -> STM a
 cps f = do
-  r <- newEmptyMVar
+  r <- newEmptyTMVar
   f r
-  readMVar r -- this causes deadlocks.
+  readTMVar r -- this causes deadlocks.
 
-valToObj :: Value -> IO Object
+valToObj :: Value -> STM Object
 valToObj (VObject obj) = return obj
 valToObj _ = fail "Primitive to Object maping not implimented yet"

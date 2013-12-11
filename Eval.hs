@@ -10,7 +10,8 @@ import Prelude hiding (lookup)
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
-import Control.Concurrent.Chan
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TChan
 
 type Err = String
 
@@ -31,7 +32,7 @@ eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
 eval (EVar var) = do
-  val' <- get >>= (liftIO . lookup var)
+  val' <- get >>= (liftIO . atomically . lookup var)
   case val' of
     Just val -> return val
     Nothing  -> throwError $ "Not in scope: " ++ (show var)
@@ -40,7 +41,7 @@ eval (Assign (LVar var) exp) = do
   modify (insert var val)
   return val
 eval (Apply var argExprs) = do
-  fn <- get >>= (liftIO . lookup var)
+  fn <- get >>= (liftIO . atomically . lookup var)
   case fn of
     Nothing -> throwError $ "Not in scope: " ++ (show var)
     Just (VFunction f arity) -> if checkArity arity (length argExprs) 
@@ -72,7 +73,7 @@ eval (EClass n Nothing exp) = do
 	  , properName = name n
 	  }
   pid <- liftIO $ spawn cls
-  liftIO $ writeChan (channel pid) $ Eval exp
+  liftIO $ atomically $ writeTChan (channel pid) $ Eval exp
   return cls			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 

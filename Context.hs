@@ -2,7 +2,7 @@ module Context where
 
 import qualified Data.Map as M
 import Control.Monad
-import Control.Concurrent.MVar
+import Control.Concurrent.STM
 import Object
 import Object.Graph
 import Var
@@ -10,10 +10,10 @@ import Var
 data Context = Context 
                {locals :: M.Map String Value
                , self :: Object
-               , continuation :: MVar Value
+               , continuation :: TMVar Value
                }
 
-lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
+lookup :: Var -> Context -> STM (Maybe Value) --Check Local context
 lookup Self c = return $ Just $ VObject $ self c
 lookup var c = 
   case  M.lookup (top var) (locals c) of
