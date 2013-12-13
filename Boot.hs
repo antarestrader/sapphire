@@ -36,7 +36,7 @@ boot = do
     cont <- newEmptyTMVar
     writeTChan (channel object) (Execute Var{name="setClass", scope=[]} [VObject cls] cont)
     -- FIXME: circular call structure is causing deadlock
-    -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object] cont)
+    writeTChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object] cont)
     -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Class", VObject cls] cont)
   return $ Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
 

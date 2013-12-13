@@ -2,16 +2,12 @@ module Object where
 
 import qualified Data.Text as T
 import qualified Data.Map as M
-import Control.Monad.Error
-import Control.Monad.State
-import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar 
-import Control.Concurrent.STM.TChan 
 
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
 import Var
+import Continuation (ProcessId)
+import qualified Continuation as C
 
 type Fn = [Value] -> EvalM Value
 
@@ -48,7 +44,7 @@ instance Show Value where
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
   show (VObject (Object {klass = Class {properName = n}})) = "<Object "++n++">"
   show (VObject (Object {})) = "<Object>"
-  show (VObject (Pid {thread = t})) = "<PID "++ show t ++">"
+  show (VObject (Pid (t,_))) = "<PID "++ show t ++">"
   show (VObject (Class  {properName = n})) = "<Class "++n++">"
 
 type Arity = (Int,Maybe Int)
@@ -64,16 +60,16 @@ type Precedence = (Int, AssocLR, AssocLR)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
-data Object = Pid {channel :: (TChan Message), thread :: ThreadId}
+data Object = Pid (ProcessId Message Value)
             | Object { ivars   :: M.Map String Value  -- instance variables
                      , klass   :: Object   -- the class of this instance
 		     , modules :: [Object] -- included modules `head` shadows `tail`
-		     , process :: Maybe Object -- must be a PID pointing to this object 
+		     , process :: Maybe (ProcessId Message Value) -- must be a PID pointing to this object 
 		     }
             | Class   {ivars   :: M.Map String Value  -- instance variables
 	             , klass   :: Object   -- the class of this instance (typicall Class)
 		     , modules :: [Object] -- included modules `head` shadows `tail`
-		     , process :: Maybe Object -- must be a PID pointing to this object
+		     , process :: Maybe (ProcessId Message Value) -- must be a PID pointing to this object
 		     , super   :: Object   -- the super-class of this class 
 		     , cvars :: M.Map String Value     -- instance methods
 		     , properName :: String           -- The name in the "global" scope of this class
@@ -82,20 +78,15 @@ data Object = Pid {channel :: (TChan Message), thread :: ThreadId}
             | ROOT
 
 data Message =
-    Execute Var [Value] (TMVar Value) --may want ot make this strict in value
-  | Search Var  (TMVar (Maybe Value)) -- check only ivars more to klass w/ search
-  | SearchClass Var (TMVar (Maybe Value)) -- check only cvars move to super class
-  | Retrieve Var (TMVar (Maybe Value)) -- when scopped, look only in ivars no graph search
-  | Eval Exp
+    Execute Var [Value] --may want ot make this strict in value
+  | Search Var  -- check only ivars more to klass w/ search
+  | SearchClass Var  -- check only cvars move to super class
+  | Retrieve Var  -- when scopped, look only in ivars no graph search
+  | Eval Exp 
   | Terminate
 
+type Continuation = C.Continuation Message Value
 
-cps :: (TMVar a -> STM ()) -> IO a
-cps f = do
-  r <- newEmptyTMVarIO
-  atomically $ f r
-  atomically $ readTMVar r -- this causes deadlocks.
-
-valToObj :: Value -> STM Object
+valToObj :: Value -> IO Object
 valToObj (VObject obj) = return obj
 valToObj _ = fail "Primitive to Object maping not implimented yet"

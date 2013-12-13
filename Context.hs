@@ -10,7 +10,7 @@ import Var
 data Context = Context 
                {locals :: M.Map String Value
                , self :: Object
-               , continuation :: TMVar Value
+               , continuation :: Continuation
                }
 
 lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
