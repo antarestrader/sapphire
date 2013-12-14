@@ -215,7 +215,8 @@ receiving such a message is then obligated to use this new channel in preference
 to any others with the same tid, as they will be blocked waiting for a response.
 
 In fact sense many Pids could block on the same call chain, this will need to be
-some kind of list of shadowed Pids. This could be a performance bottleneck.
+some kind of list of shadowed Pids. This 
+could be a performance bottleneck.
 
 There is also now the issue of needing the response and the message queue to
 both wake up the thread. Some possibilities here are a modified type of Chan, or
@@ -224,3 +225,67 @@ constantly use `atomically` was a good reason to try to avoid the added
 complexity of STM, but faced with the present reality, it may add less
 complexity, and be cleaner then a solution that only uses MVars.  Some
 experimentation will be necessary.
+
+## December 13, 2013 at 11:20pm
+## Continuations
+
+In my bid to implement STM I have re factored the threaded code into a module
+called `Continuation`.  The module is named for the traditional programing
+concept of the place a function call returns to once complete and the roles are
+somewhat similar.  My continuation is a data structure rather then a stack frame
+however.
+
+Rather then placing the response on the top of the stack an returning (or in the
+case of Haskell generation a result value in a function) responses are
+accommodated by means of a (T)Mvar.  This structure is either empty or holds a
+value.  Writing to a full MVar or reading from an empty one cause the thread to
+block (or in the STM case the transaction to retry) until the condition changes.
+In the naïve approach implemented in Master, a thread would place a call
+including this MVar into the message queue of another thread and then try to
+read the MVar -- blocking until the other thread filled it with the result.
+
+In order not to deadlock when one process calls another and then receives a call
+in return, any process waiting for a response must still respond to new
+messages. (This is the problem that cause the deadlock the STM branch is trying
+to address) However, data integrity requires that *only* calls from "downstream"
+of the dispatch point be answered.
+
+The solution is to add a second data structure to the Continuation: an
+associative list of ThreadId to message queues. When ever new message is sent
+this list is consulted and if the thread has an entry then that message queue
+shadows the one in the Pid reference.
+
+Further, before a thread may block waiting for a response it must create a new
+message queue and place it and its own threadId at the head of the list before
+sending the message. It then processes the new message queue which only holds
+messages from the downstream call sequence. These messages are processes prior
+to retrieving the response in the same way the primary (but now bocked) queue
+would. The STM `orElse` combinator is used to allow this multiplexing.  The
+relevant line is Continuation.hs:79,73.
+
+In order to respond to messages, Objects wishing to block waiting for return
+values must provide enough information to the dispatch method to create the
+response loop. This is going to require a significant rewrite of Spawn.
+
+One of the new complexities is keeping track of the current continuation.  A
+copy lives in the Context structure used by the EvalM monad.  Because
+Continuations work in the STM monad and EvalM must be a MonadIO the two cannot
+be merged. There will be a lot of glue code needed to get relevant data to move
+back and forth between the two areas.
+
+Proper tail calls are implemented by sending the TMVar hole for the result to
+the next function in line instead of creating a new one and waiting for it to
+fill.
+
+This structure allows for a unique feature of Sapphire.  Values can be returned
+before the calculations are complete if the response is available.  The `return`
+statement puts the value into the Continuation but does not necessarily end
+computation in the function.  Imagine a function that took a long time to
+process. It could be kicked of by a function that returns as soon as the
+computation is set to start but then allows the initial thread to resume while
+the computation is on going. One could also imagine passing a call-back that
+could be triggered when the long function was complete.
+
+Asynchronous sends, proper tail calls, and returns do not need to perform
+special message queue functions because these will all complete and the primary
+queue will then unblock to handle further messages.

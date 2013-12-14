@@ -2,13 +2,12 @@ module Continuation
   ( Message
   , MessageQueue
   , ProcessId
-  , ContM
   , Responder
   , Continuation
   , newContIO
-  , newCont
   , send
   , dispatch
+  , reply
   
   )where
 
@@ -63,7 +62,7 @@ send cont (tid, chan) msg = do
   cont' <- newContIO
   atomically $  writeTChan chan' (msg, cont') 
 
--- send a message ans wait for the response 
+-- send a message and wait for the response 
 dispatch :: Continuation m r -> a -> Responder a m r -> ProcessId m r-> m -> IO r
 dispatch cont obj resp (tid, chan) msg = do
   rset <- runContM cont $ do
@@ -81,6 +80,9 @@ dispatch cont obj resp (tid, chan) msg = do
         case r of
           Left m -> resp obj' m >>= loop rr
           Right r' -> return r' 
+
+reply ::  Continuation m r -> r -> IO Bool
+reply cont val= atomically $ tryPutTMVar (replier cont) val
 
 -- cont list may become smarter (i.e Data.Map)
 
