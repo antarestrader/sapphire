@@ -229,7 +229,7 @@ experimentation will be necessary.
 ## December 13, 2013 at 11:20pm
 ## Continuations
 
-In my bid to implement STM I have re factored the threaded code into a module
+In my bid to implement STM I have refactored the threaded code into a module
 called `Continuation`.  The module is named for the traditional programing
 concept of the place a function call returns to once complete and the roles are
 somewhat similar.  My continuation is a data structure rather then a stack frame
@@ -289,3 +289,38 @@ could be triggered when the long function was complete.
 Asynchronous sends, proper tail calls, and returns do not need to perform
 special message queue functions because these will all complete and the primary
 queue will then unblock to handle further messages.
+
+## January 3, 2014 10:50pm
+## Continuations Continued
+
+I'm back from Christmas Break.
+
+I have worked through some basic benchmarking with the continuation code.  It
+is not supremely fast, but it works at a rate that should allow it to present
+only a moderate bottleneck.
+
+The code is not elegant and needs some refactoring.  The ContM monad turns out
+to be overkill and will be removed.  MessageQueues need to become internal again
+but it is making testing easier that they are not.
+
+The most vexing problem is that `dispatch` is so brittle.  The need to be able
+to call back into an object (or in this case a ProcessId as Objects are abstract
+with respect to continuations) means that I have to generate a new message queue
+before I dispatch a message so that I can properly shadow the queue that I'm
+going to block once I try to read the reply.  It bothers me that I need to know
+how I will receive a message before I send it.
+
+One way I think I can potentially avoid this is to have central dispatch
+mechanism. My understanding is that this is how Erlang's run time works.  There
+is a central dispatch process that receives messages to all threads then places
+the message the proper queue.  By centralizing this, I could relieve the Object
+of any responsibility for tracking it's own queue.  It would only need to supply
+a responder and an initial value and the central dispatcher would take care of
+the rest.
+
+On the other hand this central process would become a congestion point in and
+of itself.
+
+For the moment I will press ahead with the current system, but I wanted to write
+this down as something to possibly come back to.  Particularly if the present
+system proves too inefficient.
