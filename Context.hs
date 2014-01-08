@@ -8,18 +8,19 @@ import Control.Monad.State.Class
 import Control.Concurrent.STM
 import Object
 import Object.Graph
+import {-# SOURCE #-} Object.Spawn
 import Continuation (dispatch, send, tail, reply)
 import Var
 
 data Context = Context 
-               {locals :: M.Map String Value
+               { locals :: M.Map String Value
                , self :: Object
                , continuation :: Continuation
                }
 
 dispatchC :: Context -> Process -> Message -> IO (Value, Context)
 dispatchC c pid msg= do
-  (val, self') <- dispatch (self c) (undefined "responderObject") (continuation c) pid msg
+  (val, self') <- dispatch (self c) (responderObject) (continuation c) pid msg
   return (val, c{self=self'})
 
 dispatchC_ :: Context -> Process -> Message -> IO Value
@@ -34,6 +35,9 @@ dispatchM_ :: (MonadState Context m, MonadIO m) => Process -> Message -> m Value
 dispatchM_ pid msg= do
   context <- get
   liftIO $ dispatchC_ context pid msg
+
+sendC :: Context->Process->Message-> IO Replier
+sendC c pid msg = send (continuation c) pid msg
 
 sendM ::  (MonadState Context m, MonadIO m) => Process -> Message -> m Replier
 sendM pid msg = do

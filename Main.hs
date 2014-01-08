@@ -11,12 +11,14 @@ import AST
 import Parser
 import Eval
 import Context
+import Continuation(newContIO)
 import Boot(boot)
 
 main :: IO ()
 main = do
   main <- boot
-  let context = Context {locals = M.empty, self=main, continuation = undefined}
+  cont <- newContIO
+  let context = Context {locals = M.empty, self=main, continuation = cont}
   repl context
  
 repl :: Context -> IO ()

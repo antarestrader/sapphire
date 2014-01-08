@@ -3,7 +3,7 @@ module Boot where
 import Var
 import Object
 import Object.Spawn
-import Context
+import Continuation (send, newContIO)
 import Control.Monad.State
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
@@ -22,7 +22,7 @@ boot = do
         super = ROOT,
         cvars = bootstrapset,
         properName = "Object"}
-  putStrLn $ "Object is "++ show (thread object)
+  let (Pid obj_pid) = object 
   cls <- spawn $ VObject Class{
         ivars = M.empty,
 	klass = object,
@@ -31,14 +31,13 @@ boot = do
 	super = object,
 	cvars = M.empty,
 	properName = "Class"}
-  putStrLn $ "Class is "++ show (thread cls)
-  atomically $ do
-    cont <- newEmptyTMVar
-    writeTChan (channel object) (Execute Var{name="setClass", scope=[]} [VObject cls] cont)
-    -- FIXME: circular call structure is causing deadlock
-    writeTChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object] cont)
-    -- writeChan (channel object) (Execute Var{name="setCVar", scope=[]}  [VAtom "Class", VObject cls] cont)
+  cont <- newContIO
+  send cont obj_pid (Execute Var{name="setClass", scope=[]} [VObject cls])
+  send cont obj_pid (Execute Var{name="setCVar", scope=[]}  [VAtom "Object", VObject object])
+  send cont obj_pid (Execute Var{name="setCVar", scope=[]}  [VAtom "Class", VObject cls]) 
+
   return $ Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
+
 
 bootstrapset = M.fromList [
          ("add" , VFunction F.add  (2,Just 2))

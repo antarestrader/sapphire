@@ -7,6 +7,7 @@ import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
 import Var
 import qualified Continuation as C
+import Data.Maybe
 
 type Fn = [Value] -> EvalM Value
 
@@ -92,3 +93,9 @@ type Replier = C.Replier Value
 valToObj :: Value -> IO Object
 valToObj (VObject obj) = return obj
 valToObj _ = fail "Primitive to Object maping not implimented yet"
+
+thread :: Object -> String  -- for debugging purposes only
+thread (Pid pid) = show $ fst pid
+thread ROOT = "ROOT"
+thread obj | isJust (process obj) = show $ fst $ fromJust $ process obj
+thread _ = "unkonwn"

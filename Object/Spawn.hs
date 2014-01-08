@@ -2,6 +2,7 @@
 
 module Object.Spawn where
 
+import Prelude hiding (lookup)
 import qualified Continuation as C
 import Object
 import Object.Graph
@@ -9,7 +10,7 @@ import {-# SOURCE #-} Eval
 import AST
 import Var
 import Context
-import Data.Map as M
+import qualified Data.Map as M
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
@@ -59,24 +60,21 @@ evaluate exp obj cont = do
 
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
+  let context = Context {locals = M.empty, self = obj, continuation = cont}
   method <- do 
-    r <- try $ getMethod obj var cont 
+    r <- try $ getMethod var context 
     case r of
       Right m -> return m
       Left (e:: BlockedIndefinitelyOnSTM) -> fail $ "STM Blocked getting method " ++ show var
-  let context = Context {locals = M.empty, self = obj, continuation = cont}
   result <- runEvalM (method args) context
   case result of
     Left  err -> (C.reply cont (VError err)) >> return obj
     Right (val,Context{self=obj'}) -> (C.reply cont val) >> return obj'
 
--- --- -- --- -- --- -- --- -- ---
--- --- -- --- -- --- -- --- -- ---
--- Rewrite for new Contiunation --
---                              --
--- --- -- --- -- --- -- --- -- ---
--- --- -- --- -- --- -- --- -- ---
+getMethod :: Var -> Context -> IO Fn
+getMethod  var c = do
+  Just (VFunction fn _) <- lookup var c
+  return fn
 
-getMethod = undefined
 
 
