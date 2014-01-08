@@ -2,6 +2,7 @@
 
 module Object.Spawn where
 
+import qualified Continuation as C
 import Object
 import Object.Graph
 import {-# SOURCE #-} Eval
@@ -16,72 +17,66 @@ import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 spawn :: Value -> IO Object
 spawn (VObject obj@(Pid {})) = return obj
-spawn (VObject obj) | isJust (process obj) = return $ fromJust $ process obj
+spawn (VObject obj) | isJust (process obj) = return $ Pid $ fromJust $ process obj
 spawn (VObject obj) = do
-  chan <- newTChanIO
-  tid  <- forkIO (initialize chan obj)
-  return $ Pid chan tid
-spawn v = do
-  chan <- newTChanIO
-  tid  <- forkIO (respondPrim chan v)
-  return $ Pid chan tid
+  process_id <- C.respondWith obj responderObject
+  C.unsafeSend process_id (Initialize process_id)
+  return $ Pid process_id
+spawn val = do
+  process_id <- C.respondWith val responderPrim
+  return $ Pid process_id
 
-initialize chan obj = do
-  tid <- myThreadId
-  err <- try $ respond chan obj{process = Just (Pid chan tid)}
-  case err of
-    Right _ -> return ()
-    Left (e:: BlockedIndefinitelyOnSTM) -> putStrLn $ "STM Blocked " ++ show tid
+responderPrim :: C.Responder Value Message Value
+responderPrim val msg = do  --TODO actually do something here
+  C.reply (snd msg) $ val
+  return val
 
-respond :: TChan Message -> Object -> IO ()
-respond chan obj = do
-  msg' <- try $ atomically $ readTChan chan
-  msg <- case msg' of
-    Right m -> return m
-    Left (e:: BlockedIndefinitelyOnSTM) -> do
-      tid <- myThreadId
-      putStrLn $ "STM Blocked reading message " ++ show tid
-      fail "dieing"
-  case msg of
-    Terminate -> return ()
-    Eval exp  -> evaluate exp obj >>= respond chan
-    Search      var cont -> (atomically $ search var obj cont)   >> respond chan obj
-    SearchClass var cont -> (atomically $ search' var obj cont)  >> respond chan obj
-    Retrieve    var cont -> (atomically $ retrieve var obj cont) >> respond chan obj
-    Execute     var args cont -> call obj var args cont >>= respond chan
+responderObject :: C.Responder Object Message Value
+responderObject obj msg =
+  case fst msg of
+    Eval        exp -> evaluate exp obj (snd msg)
+    Search      var -> search var obj (snd msg)   >>  return obj
+    SearchClass var -> search' var obj  (snd msg)  >>  return obj
+    Retrieve    var -> retrieve var obj  (snd msg) >>  return obj
+    Execute     var args  -> call obj var args (snd msg)
+    Initialize  pid -> do
+      obj' <- initialize pid obj
+      C.reply (snd msg) $ VObject $ Pid pid
+      return obj'
 
-respondPrim chan obj = do
-  msg <- atomically $ readTChan chan
-  case msg of
-    Terminate -> return ()
-    _ -> respondPrim chan obj -- TODO: actually respond
+initialize :: Process -> Object -> IO Object
+initialize pid obj = do
+  -- TODO: initialization
+  return obj{process = Just pid}
 
-evaluate :: Exp -> Object -> IO Object
-evaluate exp obj = do
-  c <- newEmptyTMVarIO
-  let context = Context {locals = M.empty, self = obj, continuation = c}
+evaluate :: Exp -> Object -> Continuation -> IO Object
+evaluate exp obj cont = do
+  let context = Context {locals = M.empty, self = obj, continuation = cont}
   result <- runEvalM (eval exp) context
   case result of 
-    Left  err -> fail err
-    Right (_,Context {self = obj'}) -> return obj'
+    Left  err -> fail err --Todo Handle Errors
+    Right (val,Context {self = obj'}) -> C.reply cont val >> return obj'  -- not proper tail call
 
-call :: Object -> Var -> [Value] -> (TMVar Value) -> IO Object
+call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   method <- do 
-    r <- try $ getMethod obj var
+    r <- try $ getMethod obj var cont 
     case r of
       Right m -> return m
-      Left (e:: BlockedIndefinitelyOnSTM) -> fail $ "STM Blocked getting method" ++ show var
+      Left (e:: BlockedIndefinitelyOnSTM) -> fail $ "STM Blocked getting method " ++ show var
   let context = Context {locals = M.empty, self = obj, continuation = cont}
   result <- runEvalM (method args) context
   case result of
-    Left  err -> (atomically $ tryPutTMVar cont (VError err)) >> return obj
-    Right (val,Context{self=obj'}) -> (atomically $ tryPutTMVar cont val) >> return obj' 
+    Left  err -> (C.reply cont (VError err)) >> return obj
+    Right (val,Context{self=obj'}) -> (C.reply cont val) >> return obj'
 
-getMethod obj var = do
-  val <- cps $ search var obj -- this causes dead-lock if search loops around
-  case val of
-    Just (VFunction fn _) -> return fn
-    Just _ -> fail "Function casting not yet implimented"
-    Nothing -> fail "method not in scope"
+-- --- -- --- -- --- -- --- -- ---
+-- --- -- --- -- --- -- --- -- ---
+-- Rewrite for new Contiunation --
+--                              --
+-- --- -- --- -- --- -- --- -- ---
+-- --- -- --- -- --- -- --- -- ---
+
+getMethod = undefined
+
 

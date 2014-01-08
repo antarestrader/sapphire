@@ -3,9 +3,12 @@ module Continuation
   , MessageQueue
   , ProcessId
   , Responder
+  , Replier
   , Continuation
   , newContIO
   , send
+  , tail
+  , unsafeSend
   , dispatch
   , reply
   , newMessageQueue
@@ -13,6 +16,7 @@ module Continuation
   , respondWith
   )where
 
+import Prelude hiding (tail)
 import Control.Monad.State
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -32,6 +36,8 @@ readQueue :: MessageQueue m r -> IO (Message m r)
 readQueue (Queue chan) = atomically $ readTChan chan
 
 writeQueue (Queue chan) = atomically . writeTChan chan
+
+newtype Replier r = R (TMVar r)
 
 -- A place that messages can be sent
 type ProcessId m r = (ThreadId, MessageQueue m r)
@@ -71,11 +77,20 @@ newContIO = do
   return $ Cont { replier = x, receivers=emptyContList}
 
 -- send a message, but don't wait for the response
-send :: Continuation m r -> ProcessId m r -> m -> IO ()
+send :: Continuation m r -> ProcessId m r -> m -> IO (Replier r)
 send cont pid msg = do
   let queue = shadowChannel pid cont
   cont' <- newContIO
-  writeQueue queue (msg, cont') 
+  writeQueue queue (msg, cont')
+  return $ R $ replier cont'
+
+-- send without checking for shadowing.  This can only be used when the 
+-- programmer is sure that the process is not shadowed.  E.g. to add an 
+-- initialization message to a brand new process.
+unsafeSend :: ProcessId m r -> m -> IO ()
+unsafeSend pid msg = do
+  cont' <- newContIO
+  writeQueue (snd pid) (msg, cont')
 
 -- respond to the message with what ever the responce to this call is.
 -- proper tail recursion.
@@ -86,7 +101,7 @@ tail cont pid msg = do
 
 
 -- send a message and wait for the response 
-dispatch :: a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO r
+dispatch :: a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO (r, a)
 dispatch obj responder cont pid msg = do
   let dispatchQueue =  shadowChannel pid cont -- where to send the message
   (cont', responseQueue) <- shadow cont -- set up a shadowed reciever
@@ -97,7 +112,7 @@ dispatch obj responder cont pid msg = do
         r <- atomically ((readTChan chan >>= (return . Left)) `orElse` (readTMVar answer >>= (return . Right)))
         case r of 
           Left m -> responder obj m >>= loop answer (Queue chan)
-          Right r' -> return r'
+          Right r' -> return (r', obj)
 
 -- send this reply to the message
 reply ::  Continuation m r -> r -> IO Bool

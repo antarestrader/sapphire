@@ -8,12 +8,15 @@ import Object
 import Object.Spawn
 import Context
 import Var
+import Continuation(reply)
 import Prelude hiding (lookup) 
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
+import Control.Monad.IO.Class
+import Control.Monad.State.Class
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 type Err = String
@@ -27,6 +30,8 @@ runEvalM e c = do
     Right x -> return x
     Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
 
+-- eval turns an expression into a value, potentially performing
+-- side effects along the way
 eval :: Exp -> EvalM Value
 eval (EValue val) = return val
 eval (EInt i) = return (VInt i)
@@ -79,8 +84,8 @@ eval (EClass n Nothing exp) = do
 	  , cvars = M.empty
 	  , properName = name n
 	  }
-  pid <- liftIO $ spawn cls
-  liftIO $ atomically $ writeTChan (channel pid) $ Eval exp
+  Pid pid <- liftIO $ spawn cls
+  sendM pid $ Eval exp
   return cls			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 

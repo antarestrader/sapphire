@@ -324,3 +324,44 @@ of itself.
 For the moment I will press ahead with the current system, but I wanted to write
 this down as something to possibly come back to.  Particularly if the present
 system proves too inefficient.
+
+## January 6, 2014 5:34pm
+## Epiphanies for Epiphany
+
+I need to walk out the door shortly, but I have a few notes I need to make
+
+1) There is too much in Eval.hs and some of the plumbing needs to be more
+generic and move elsewhere.  In particular dispatchM need to go in context with
+a `StateMonad Context => m, MonadIO => m` type restriction.
+
+2) Deferred evaluation *is* possible without creating a new new MessageQueue.
+By using deferred evaluation the programmer has told us it is ok to accept
+messages from other processes, including the one the message was sent to(!),
+using the current message queue.  All we must do is send a message without any
+shadow on our own queue.  Then use the same STM transaction used in
+`Continuation.hs:dispatch` with the MessageQueue in our current Continuation.
+Because we use this 'public' message queue, there is no chicken and egg problem
+about when to create a new MessageQueue and how to let the called function know
+to use it.  Because we will never block that queue waiting for its response, we
+will not deadlock.
+
+This in tern allows us to kick a few different methods concurrently and merge
+them back together for the final answer (an important form of concurrency for
+Sapphire)
+
+To impliment this we will need a new Value which holds a `TMVar Value` (a.k.a) that can be both
+read and checked for completeness etc.  Trying to make an object out of this
+value is a matter of waiting for it to return while continuing to answer the
+existing message queue.
+
+Quick thought here.  What happens when one of these is passed into a function
+that needs to complete before answering outside messages, but must not block
+it's queue while while waiting for a value.  Possible solution is to form a TVar
+that contains the current MessageQueue and replace it, but there are race
+conditions here.  Another is to not pass a Future to another function (perhaps
+unless it knows it's coming.
+
+All thing to work out.  For now, I continue to work on pushing Continuation into
+the rest of the system.  Currently I'm working on Contex and Graph wish is good
+because that is where the deadlock that started this mess lived.
+
