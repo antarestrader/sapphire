@@ -52,6 +52,26 @@ eval (Assign (LVar var) exp) = do
   val <- eval exp
   modify (insert var val)
   return val
+
+eval (Call expr msg args) = do
+  val <- eval expr
+  r <- liftIO $ valToObj val
+  case r of 
+    Pid pid -> do -- Remote process send a message
+        vals <- mapM eval args
+        dispatchM pid (Execute (simple msg) vals)
+    receiver -> do
+      method <- get >>= liftIO . lookupIvars (simple msg) receiver
+      case method of
+        Nothing -> throwError $ "Method not found: " ++ msg
+        Just (VFunction fn arity) -> do -- eval args and call function
+          guard $ checkArity arity $ length args 
+          vals <- mapM eval args
+          (result, obj') <- with receiver (fn vals)
+          -- TODO: Put obj' back
+          return result
+        Just _ -> throwError $ "Not Implemented: cast to functions"
+
 eval (Apply var argExprs) = do
   fn <- get >>= (liftIO  . lookup var)
   case fn of
@@ -62,6 +82,7 @@ eval (Apply var argExprs) = do
           "Arity Mismatch on function " ++ show var ++ 
 	  " with " ++ show (length argExprs) ++" arguments."
     Just val -> eval (Call (EValue val) "call" argExprs)
+
 eval (Lambda params exp) = do
   c <- get
   return (VFunction (mkFunct c params exp) (length params, Just $ length params)) -- no varargs for now
@@ -86,7 +107,8 @@ eval (EClass n Nothing exp) = do
 	  }
   Pid pid <- liftIO $ spawn cls
   sendM pid $ Eval exp
-  return cls			   
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid]
+  return $ VObject $ Pid pid			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value

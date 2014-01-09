@@ -61,20 +61,14 @@ evaluate exp obj cont = do
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   let context = Context {locals = M.empty, self = obj, continuation = cont}
-  method <- do 
-    r <- try $ getMethod var context 
-    case r of
-      Right m -> return m
-      Left (e:: BlockedIndefinitelyOnSTM) -> fail $ "STM Blocked getting method " ++ show var
-  result <- runEvalM (method args) context
+  method <- lookup var context
+  result <- case method of 
+    Just (VFunction fn _) -> runEvalM (fn args) context
+    Nothing ->  return $ Left $ "Method missing" ++ show var
+    _ -> return $ Left "Method cast not yet implimented"
   case result of
-    Left  err -> (C.reply cont (VError err)) >> return obj
-    Right (val,Context{self=obj'}) -> (C.reply cont val) >> return obj'
-
-getMethod :: Var -> Context -> IO Fn
-getMethod  var c = do
-  Just (VFunction fn _) <- lookup var c
-  return fn
+        Left  err -> (C.reply cont (VError err)) >> return obj
+        Right (val,Context{self=obj'}) -> (C.reply cont val) >> return obj' 
 
 
 

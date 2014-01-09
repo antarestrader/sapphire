@@ -26,15 +26,12 @@ dispatchC c pid msg= do
 dispatchC_ :: Context -> Process -> Message -> IO Value
 dispatchC_ c p m = fst `fmap` dispatchC c p m
 
-dispatchM :: (MonadState Context m, MonadIO m) => Process -> Message -> m (Value, Context)
+dispatchM :: (MonadState Context m, MonadIO m) => Process -> Message -> m Value
 dispatchM pid msg= do
   context <- get
-  liftIO $ dispatchC context pid msg
-
-dispatchM_ :: (MonadState Context m, MonadIO m) => Process -> Message -> m Value
-dispatchM_ pid msg= do
-  context <- get
-  liftIO $ dispatchC_ context pid msg
+  (val,context') <- liftIO $ dispatchC context pid msg
+  put context'
+  return val
 
 sendC :: Context->Process->Message-> IO Replier
 sendC c pid msg = send (continuation c) pid msg
@@ -48,6 +45,15 @@ replyM ::  (MonadState Context m, MonadIO m) => Value -> m Bool
 replyM val = do
   cont <- gets continuation
   liftIO $ reply cont val
+
+with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
+with obj f = do
+  context <- get
+  put context{self=obj}
+  a <- f
+  obj' <- gets self
+  put context
+  return (a, obj')
 
 lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
 lookup Self c = return $ Just $ VObject $ self c
