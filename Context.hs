@@ -4,6 +4,7 @@ module Context where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
 import Control.Monad
+import Control.Monad.Error
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Control.Concurrent.STM
@@ -113,7 +114,16 @@ retrieve' var obj c = case M.lookup (top var) (ivars obj) of
         retrieve' var' obj' c
 
 insertIVar :: String -> Value -> Context -> Context
-insertIVar s val c@Context{self=obj} = c{self=obj{ivars=(M.insert s val (ivars obj))}} 
+insertIVar s val c@Context{self=obj} = c{self=obj{ivars=(M.insert s val (ivars obj))}}
+
+insertCVarM s val = do
+  c <- get
+  let obj = self c
+  case obj of
+    Class{cvars = cvs} -> do
+      put c{self = obj{cvars = M.insert s val cvs}}
+      return val
+    _ -> throwError "Class opperation performed on non-class object"
 
 insert :: Var -> Value -> Context -> Context
 insert (Var {name=s, scope=[]}) val c@Context {locals=l} =

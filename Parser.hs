@@ -205,7 +205,13 @@ classParser = do
   exp <- block <|> expr
   return $ EClass n s exp
 
-
+defParser :: TParser Exp
+defParser = do
+  keyword "def"
+  n <- identifier
+  ps <- option [] $ paramList
+  exp <- block
+  return $ Def n ps exp
 
 lambda :: TParser Exp
 lambda = do
@@ -250,7 +256,7 @@ expr1 = do
     extend exp = (extension exp >>= extend) <|> return exp
 
 
-statement = lambda <|> ifParser <|> classParser
+statement = lambda <|> ifParser <|> defParser <|> classParser
 
 expr = statement <|> expr1
 

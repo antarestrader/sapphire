@@ -61,6 +61,10 @@ eval (Assign (LIVar s) exp) = do
   val <- eval exp
   modify (insertIVar s val)
   return val
+eval (Assign (LCVar s) exp) = do
+  val <- eval exp
+  insertCVarM s val
+  return val
 
 eval (Call expr msg args) = do
   val <- eval expr
@@ -91,10 +95,9 @@ eval (Apply var argExprs) = do
           "Arity Mismatch on function " ++ show var ++ 
 	  " with " ++ show (length argExprs) ++" arguments."
     Just val -> eval (Call (EValue val) "call" argExprs)
-
-eval (Lambda params exp) = do
-  c <- get
-  return (VFunction (mkFunct c params exp) (length params, Just $ length params)) -- no varargs for now
+eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
+eval (Define lhs params exp) = eval $ Assign lhs (Lambda params exp)
+eval (Lambda params exp) = return (VFunction (mkFunct params exp) (length params, Just $ length params)) -- no varargs for now
 eval (Block exps) = fmap last $ mapM eval exps
 eval (If pred cons (Just alt)) = do
   r <- eval pred
@@ -120,8 +123,10 @@ eval (EClass n Nothing exp) = do
   return $ VObject $ Pid pid			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
-mkFunct :: Context -> [String] -> Exp -> [Value] -> EvalM Value
-mkFunct c params exp vals = using (merge (zip params vals) c) (eval exp)
+mkFunct :: [String] -> Exp -> [Value] -> EvalM Value
+mkFunct params exp vals = do
+  c <- get
+  using (merge (zip params vals) c) (eval exp)
 
 using :: Context -> EvalM a -> EvalM a
 using c evalm = do

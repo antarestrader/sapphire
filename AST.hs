@@ -15,8 +15,8 @@ data Exp =
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp
   | Lambda [String] Exp
-  | Define String [String] [Exp]
-  | Def String [String] [Exp]
+  | Define LHS [String] Exp
+  | Def String [String] Exp
   | Apply Var [Exp]
   | Call Exp String [Exp]
   | Send Exp String [Exp]
@@ -32,6 +32,7 @@ data Exp =
 data LHS = 
     LVar  Var
   | LIVar String 
+  | LCVar String 
   | LIndex Exp [Exp] 
   | LCall Exp String
   | LSend Exp String deriving Show
