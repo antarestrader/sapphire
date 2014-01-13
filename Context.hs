@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Context where
 
+import Prelude hiding (lookup)
 import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.IO.Class
@@ -55,6 +56,14 @@ with obj f = do
   put context
   return (a, obj')
 
+lookupM :: (MonadState Context m, MonadIO m) => Var -> m (Maybe Value)
+lookupM var = get >>= (liftIO . lookup var)
+
+retrieveM ::  (MonadState Context m, MonadIO m) => Var -> m (Maybe Value)
+retrieveM var = do 
+  c <- get  
+  liftIO $ retrieve' var (self c) c
+
 lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
 lookup Self c = return $ Just $ VObject $ self c
 lookup var c = 
@@ -103,6 +112,8 @@ retrieve' var obj c = case M.lookup (top var) (ivars obj) of
         obj' <- valToObj val
         retrieve' var' obj' c
 
+insertIVar :: String -> Value -> Context -> Context
+insertIVar s val c@Context{self=obj} = c{self=obj{ivars=(M.insert s val (ivars obj))}} 
 
 insert :: Var -> Value -> Context -> Context
 insert (Var {name=s, scope=[]}) val c@Context {locals=l} =

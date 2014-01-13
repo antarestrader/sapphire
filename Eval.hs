@@ -30,8 +30,8 @@ runEvalM e c = do
     Right x -> return x
     Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
 
--- eval turns an expression into a value, potentially performing
--- side effects along the way
+-- |Turns an expression into a value, potentially performing
+--  side effects along the way.
 eval :: Exp -> EvalM Value
 eval (EValue val) = return val
 eval (EInt i) = return (VInt i)
@@ -39,18 +39,27 @@ eval (EFloat f) = return (VFloat f)
 eval ENil = return VNil
 eval ETrue = return VTrue
 eval EFalse = return VFalse
+eval (EIVar s) = do
+  val' <- retrieveM $ simple s
+  case val' of
+    Just val -> return val
+    Nothing  ->return VNil
 eval (EAtom a) = return (VAtom a)
 eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
 eval (EVar var) = do
-  val' <- get >>= (liftIO . lookup var)
+  val' <- lookupM var
   case val' of
     Just val -> return val
     Nothing  -> throwError $ "Not in scope: " ++ (show var)
 eval (Assign (LVar var) exp) = do
   val <- eval exp
   modify (insert var val)
+  return val
+eval (Assign (LIVar s) exp) = do
+  val <- eval exp
+  modify (insertIVar s val)
   return val
 
 eval (Call expr msg args) = do
