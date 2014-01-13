@@ -28,6 +28,8 @@ open   = tokenEq TOpen         <?> "'('"
 close  = tokenEq TClose        <?> "')'"
 bopen  = tokenEq TBracket      <?> "'['"
 bclose = tokenEq TBracketClose <?> "']'"
+copen  = tokenEq TBrace        <?> "'{'"
+cclose = tokenEq TBraceClose   <?> "'}'"
 tdot   = tokenEq TDot          <?> "'.' (Call)"
 tsend  = tokenEq TSend         <?> "'->' (Send)"
 assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
@@ -89,6 +91,12 @@ string = tokenP tok <?> "String literal"
     tok Token {token=TString s} = Just $ EString s
     tok _ = Nothing
 
+ivar :: TParser Exp
+ivar = tokenP tok <?> "instance variable"
+  where
+    tok Token {token=TIVar s} = Just $ EIVar s
+    tok _ = Nothing
+
 atom :: TParser Exp
 atom = tokenP tok
   where
@@ -147,6 +155,7 @@ assign lhs' = do
 
 transLHS :: Exp -> TParser LHS
 transLHS (EVar v) = return $ LVar v --TODO add indexed, called, and sent here
+transLHS (EIVar s) = return $ LIVar s
 transLHS _ = fail "illigal Left Hand Side of assignment expression"
 
 ifParser :: TParser Exp
@@ -227,7 +236,7 @@ sent exp = do
 expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP <|> trueP 
-     <|> (var >>= args)   <|> atom   <|> float 
+     <|> (var >>= args) <|> ivar  <|> atom   <|> float 
      <|> int <|> string <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp

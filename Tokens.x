@@ -31,6 +31,7 @@ tokens :-
   ^@ident\:$                      {\(AlexPn _ _ i) s -> (i, TLabel s)}
   ^@ident\:[^\:]                  {\(AlexPn _ _ i) s -> (i, TLabel s )}
   \:@ident\:$                     {\(AlexPn _ _ i) s -> (i, TLabel $ tail s)}
+  \@@ident                        {\(AlexPn _ _ i) s -> (i, TIVar  $ tail s)}
   \:@ident\:/~\:                  {\(AlexPn _ _ i) s -> (i, TLabel $ tail s)}
   \:@ident                        {\(AlexPn _ _ i) s -> (i, TAtom  $ tail s)}
   $digit+\.$digit+([eE][\+\-]?$digit+)?  {\(AlexPn _ _ i) s -> (i, TFloat (read s))}
@@ -40,10 +41,12 @@ tokens :-
   \)                              {\(AlexPn _ _ i) s -> (i, TClose)}
   \[                              {\(AlexPn _ _ i) s -> (i, TBracket)}
   \]                              {\(AlexPn _ _ i) s -> (i, TBracketClose)}
+  \{                              {\(AlexPn _ _ i) s -> (i, TBrace)}
+  \}                              {\(AlexPn _ _ i) s -> (i, TBraceClose)}
   $opSym+"="                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ init s)}
   $opSym+                         {\(AlexPn _ _ i) s -> (i, TOperator s)}
   \.                              {\(AlexPn _ _ i) s -> (i, TDot)}
-  \"@stringchar*\"                 {\(AlexPn _ _ i) s -> (i, TString s)}
+  \"@stringchar*\"                {\(AlexPn _ _ i) s -> (i, TString s)}
 {
 
 data T =
@@ -51,8 +54,10 @@ data T =
   TFloat Double    |
   TInt   Integer   | 
   TVar   String    |
+  TIVar  String    |
   TOpen | TClose   |
   TBracket | TBracketClose |
+  TBrace | TBraceClose |
   TDot | TSend     |
   TScope | TSuper  |
   TAssign | TComma |

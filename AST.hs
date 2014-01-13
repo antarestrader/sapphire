@@ -10,6 +10,7 @@ data Exp =
   | EFloat Double
   | EString String
   | EAtom String
+  | EIVar String
   | ENil | EFalse | ETrue
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp
@@ -29,7 +30,8 @@ data Exp =
   | Block [Exp]  deriving Show
 
 data LHS = 
-    LVar Var
+    LVar  Var
+  | LIVar String 
   | LIndex Exp [Exp] 
   | LCall Exp String
   | LSend Exp String deriving Show
