@@ -105,24 +105,31 @@ eval (If pred cons (Just alt)) = do
 eval (If pred cons Nothing) = do
   r <- eval pred
   if r == VNil || r == VFalse then return VNil else eval cons
-eval (EClass n Nothing exp) = do
+eval (EClass n super exp) = do
+  cls <- eval (EVar n)
+  case cls of 
+    VError _ -> buildClass n super exp
+    VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
+ 			   
+eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
+
+buildClass n super exp = do
+  VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
   VObject clsClass <- eval (EVar $ simple "Class")
-  VObject objClass <- eval (EVar $ simple "Object")
   let cls = 
         VObject Class 
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
 	  , process = Nothing
-	  , super = objClass
+	  , super = superClass
 	  , cvars = M.empty
 	  , properName = name n
 	  }
   Pid pid <- liftIO $ spawn cls
   sendM pid $ Eval exp
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid]
-  return $ VObject $ Pid pid			   
-eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
+  return $ VObject $ Pid pid
 
 mkFunct :: [String] -> Exp -> [Value] -> EvalM Value
 mkFunct params exp vals = do
