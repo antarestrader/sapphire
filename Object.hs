@@ -46,6 +46,7 @@ instance Show Value where
   show (VObject (Object {})) = "<Object>"
   show (VObject (Pid (t,_))) = "<PID "++ show t ++">"
   show (VObject (Class  {properName = n})) = "<Class "++n++">"
+  show (VError err) = "<ERROR: " ++ err ++" >"
 
 type Arity = (Int,Maybe Int)
 

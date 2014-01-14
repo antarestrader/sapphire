@@ -106,14 +106,15 @@ eval (If pred cons Nothing) = do
   r <- eval pred
   if r == VNil || r == VFalse then return VNil else eval cons
 eval (EClass n Nothing exp) = do
-  -- TODO: get Object and store new class
+  VObject clsClass <- eval (EVar $ simple "Class")
+  VObject objClass <- eval (EVar $ simple "Object")
   let cls = 
         VObject Class 
           { ivars = M.empty
-	  , klass = undefined
+	  , klass = clsClass
 	  , modules=[]
 	  , process = Nothing
-	  , super = undefined
+	  , super = objClass
 	  , cvars = M.empty
 	  , properName = name n
 	  }
@@ -133,7 +134,8 @@ using c evalm = do
   cOld <- get
   put c
   resp <- evalm
-  put cOld
+  slf <- gets self
+  put cOld{self = (slf)}
   return resp
 
 

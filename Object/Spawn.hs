@@ -61,7 +61,7 @@ evaluate exp obj cont = do
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   let context = Context {locals = M.empty, self = obj, continuation = cont}
-  method <- lookup var context
+  method <- lookup var  context
   result <- case method of 
     Just (VFunction fn _) -> runEvalM (fn args) context
     Nothing ->  return $ Left $ "Method missing" ++ show var

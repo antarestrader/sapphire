@@ -5,6 +5,7 @@ import Control.Monad.Error
 import Control.Monad.State
 import qualified Data.Map as M
 import Object
+import qualified Object.Spawn as S
 import Eval
 import Context
 
@@ -33,3 +34,18 @@ setCVar [VAtom n,val] = do
   slf <- gets self
   modify (\c -> c{self=slf{cvars = M.insert n val (cvars slf)}})
   return val
+
+new [] = do
+  slf <- gets self
+  let obj = VObject $ Object {
+      ivars = M.empty
+    , klass = slf
+    , modules = []
+    , process = Nothing
+    }
+  -- initialize here
+  return obj
+
+spawn xs = do
+  obj <- new xs >>= liftIO . S.spawn
+  return $ VObject obj
