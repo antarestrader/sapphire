@@ -160,7 +160,7 @@ parseLines' s i ls = do
     Just (l,GT) -> do -- a further indent
       ungetLine l
       blk <- parseLines
-      parseLines' s i (addBlockToHead blk ls)
+      parseLines' s i (addBlockToHead blk ls) -- put this block into the most recent line.
     Just (l,LT) -> ungetLine l >> mkBlock s i (reverse ls)  -- end of block founds 
 
 mkBlock :: LineNo -> Offset -> [Line]  -> LParser CodeBlock
@@ -169,9 +169,15 @@ mkBlock sl i ls = do
   return Block {lines = ls, startLine = sl, indent = i, filename = fn} 
 
 addBlockToHead :: CodeBlock -> [Line] -> [Line]
+-- If the most recently pushed line is blank, it does not have a block field.
+-- instead, make the blank line part of the block and add the block to the line above
+addBlockToHead blk (l@(BlankLine _):ls) = addBlockToHead (pushLine blk l) ls
+  where
+    pushLine blk@Block{lines=ls} l@(BlankLine ln) = blk{lines = l:ls, startLine = ln}
 addBlockToHead blk (l:ls) = case (block l) of
   Nothing ->  let l' = l {block = Just blk} in (l':ls)
-  Just existing -> 
+  Just existing -> -- There was already a block. (implies negitive indentation) Create a psudo Line containing no text
+                   -- but only the block as the first line of the outer block.  
     let l'   = Line { line = "", offset = indent blk, lineNo = startLine existing, block = Just existing}
 	blk' = prependLine l' blk
 	l''  = l { block = Just blk'}

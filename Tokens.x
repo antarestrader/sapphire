@@ -1,5 +1,12 @@
 {
-module Tokens where
+module Tokens (
+    Token(..)
+  , T(..)
+  , scanLine
+  , scanBlock
+  , alexScanTokens
+  )
+where
 
 import LineParser
 import Text.Printf
@@ -49,6 +56,7 @@ tokens :-
   \"@stringchar*\"                {\(AlexPn _ _ i) s -> (i, TString s)}
 {
 
+-- | The core Token types.
 data T =
   TKeyword String  | 
   TFloat Double    |
@@ -70,19 +78,22 @@ data T =
   TBlock CodeBlock
     deriving (Eq, Show)
 
+-- | A complete token with location information
 data Token = Token {tfile:: FilePath, tline :: LineNo, toffset::Offset, token::T}
 
 instance Show Token where
   show t = printf "[%s (%i,%i)]" (show $ token t) (tline t) (toffset t)
 
+-- | create a token stream for a line including its associated block
 scanLine :: FilePath ->Line -> [Token]
+scanLine _ (BlankLine _) = []
 scanLine fp l = (map (\(i,t)->Token fp (lineNo l) (fromIntegral i) t) $ alexScanTokens (line l ++ "\n")) ++ (cb l)
   where
     cb :: Line -> [Token]
     cb Line {block = Nothing} = [Token fp (lineNo l) (offset l + fromIntegral (length (line l))) TEnd]
     cb Line {block = Just bk} = [Token (filename bk) (startLine bk) (indent bk) (TBlock bk)] 
 
-
+-- | turn a block of Sapphire code into a token stream
 scanBlock :: CodeBlock -> [Token]
 scanBlock cb = concat $ map (scanLine (filename cb)) (lines cb)
 
