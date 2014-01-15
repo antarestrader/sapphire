@@ -4,7 +4,7 @@ import System.Environment
 import System.IO
 import Control.Monad.Error
 import qualified Data.Map as M
-import LineParser
+import LineParser (parseCode)
 import Tokens
 import Object
 import AST
@@ -13,6 +13,7 @@ import Eval
 import Context
 import Continuation(newContIO)
 import Boot(boot)
+import Text.Regex.Posix
 
 main :: IO ()
 main = do
@@ -57,16 +58,59 @@ tokenREPL c = do
            print toks 
            tokenREPL c
 
+data Command = Cmd{regex::String, help_text::String, fn :: ([String] -> Context -> IO())}
+
+commands :: [Command]
+commands = [
+    Cmd "sapphire[ ]*(.*)|^$" "sapphire [file]:  run the inturperter with file"                      interperter
+  , Cmd "parser[ ]*(.*)"      "parser [file]  :  parse input (or file) and display the AST"          parser
+  , Cmd "scan[ ]*(.*)"        "scan [file]    :  lex the input or file and display the token stream" scanner
+  , Cmd "(q|quit)"            "[q]uit         :  exit the program"     quiter
+  , Cmd "(h|help|\\?)"        "[h]elp (?)     :  display this message" helper
+  , Cmd "load (.*)"           "load <file>    :  load and evaluate the file" interperter
+  ]
+
+interperter [""] c = repl c
+interperter [file] c = do
+  r <- parseFile file
+  case r of
+    Left err -> putStrLn (show err)    >> system c
+    Right exps -> do
+      r' <- runEvalM (eval $ Block exps) c
+      case r' of
+        Left err -> putStrLn err >> system c
+        Right (res,c') -> putStrLn (show res) >> repl c'
+
+parser [""] c = parserREPL c
+parser [file] c = do
+  l <- parseFile file
+  case l of
+    Left err -> putStrLn (show err)    >> system c
+    Right exps -> putStrLn (show exps) >> system c
+
+scanner [""] c = tokenREPL c
+scanner [file] c = do
+   l <- readFile file
+   let toks = scanBlock $ parseCode file l
+   print toks
+   system c
+
+quiter _ _ = return ()
+
+helper _ c = do
+  mapM_ (\x -> putStrLn (help_text x)) commands
+  system c
+
 
 system c = do
   l <- cmdPrompt "System"
-  case l of
-    "" -> repl c
-    "parser" -> parserREPL c
-    "tokens" -> tokenREPL  c
-    "quit" -> return ()
-    "q" -> return ()
-    _ -> putStrLn "Unknown Command." >> system c
+  let m :: String -> [Command] -> IO ()
+      m _ [] = putStrLn "Command not found" >> helper [] c
+      m l (x:xs) = case (l =~ regex x) of
+        [] -> m l xs
+        [ys] -> (fn x) (tail ys) c
+  m l commands
+
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of

@@ -17,6 +17,11 @@ position t = newPos (tfile t) (fromIntegral $ tline t) (fromIntegral $ toffset t
 parseString :: String -> Either ParseError [Exp]
 parseString s = runParser exprs False "Input String" $ scanBlock $ parseCode "Input String" s
 
+parseFile :: FilePath -> IO (Either ParseError [Exp])
+parseFile f = do
+  source <- readFile f
+  return $ runParser exprs False f $ scanBlock $ parseCode f source
+
 tokenP :: (Token -> Maybe a) -> TParser a
 tokenP = P.token show position
 

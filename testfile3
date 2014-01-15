@@ -1,0 +1,7 @@
+class Foo
+
+  def bar(a,b)
+    @qaax = a + b
+    @baz = a * b
+  def foo
+    @qaax + @bar
