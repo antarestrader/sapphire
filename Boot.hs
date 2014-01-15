@@ -1,4 +1,4 @@
-module Boot where
+module Boot (boot) where
 
 import Var
 import Object
@@ -11,7 +11,9 @@ import Control.Concurrent.STM.TMVar
 import qualified Data.Map as M
 import qualified BuiltinFunctions as F
 
-
+-- | This function builds up the initial runtime. The run time includes
+--   Object and Class classes with the internal functions installed. The
+--   object returned is an instance of Object sutable to running code.
 boot :: IO Object
 boot = do
   object <- spawn $ VObject Class{

@@ -1,6 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Eval where
+module Eval (
+    EvalM
+  , Err
+  , runEvalM
+  , eval
+  )
+where
 
 import qualified Data.Map as M
 import AST
