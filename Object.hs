@@ -62,29 +62,29 @@ type Precedence = (Int, AssocLR, AssocLR)
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 
 data Object = Pid Process
-            | Object { ivars   :: M.Map String Value  -- instance variables
-                     , klass   :: Object   -- the class of this instance
-		     , modules :: [Object] -- included modules `head` shadows `tail`
-		     , process :: Maybe Process  -- must be a PID pointing to this object 
+            | Object { ivars   :: M.Map String Value  -- ^ instance variables
+                     , klass   :: Object   -- ^ the class of this instance
+		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
+		     , process :: Maybe Process  -- ^ must be a PID pointing to this object 
 		     }
-            | Class   {ivars   :: M.Map String Value  -- instance variables
-	             , klass   :: Object   -- the class of this instance (typicall Class)
-		     , modules :: [Object] -- included modules `head` shadows `tail`
-		     , process :: Maybe Process -- must be a PID pointing to this object
-		     , super   :: Object   -- the super-class of this class 
-		     , cvars :: M.Map String Value     -- instance methods
-		     , properName :: String           -- The name in the "global" scope of this class
-		                                      -- possibally empty for anonomous classes.
+            | Class   {ivars   :: M.Map String Value  -- ^ instance variables
+	             , klass   :: Object   -- ^ the class of this instance (typicall Class)
+		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
+		     , process :: Maybe Process -- ^ must be a PID pointing to this object
+		     , super   :: Object   -- ^ the super-class of this class 
+		     , cvars :: M.Map String Value     -- ^ instance methods
+		     , properName :: String            -- ^ The name in the "global" scope of this class
+		                                       --   possibally empty for anonomous classes.
 		     }
             | ROOT
 
 data Message =
-    Execute Var [Value] --may want ot make this strict in value
-  | Search Var  -- check only ivars move to klass w/ search
-  | SearchClass Var  -- check only cvars move to super class
-  | Retrieve Var  -- when scopped, look only in ivars no graph search
+    Execute Var [Value] -- ^ may want ot make this strict in value
+  | Search Var  -- ^  check only ivars move to klass w/ search
+  | SearchClass Var  -- ^ check only cvars move to super class
+  | Retrieve Var  -- ^ when scopped, look only in ivars no graph search
   | Eval Exp 
-  | Initialize Process -- Set process to Pid and call initialization method
+  | Initialize Process -- ^ Set process to Pid and call initialization method
   | Terminate
 
 type Continuation = C.Continuation Message Value
