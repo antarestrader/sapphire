@@ -1,33 +1,70 @@
-{-# LANGUAGE FlexibleContexts #-}
-module Context where
+-- Context.hs  Copyright 2013, 2014 John F. Miller
 
-import Prelude hiding (lookup)
+{-# LANGUAGE FlexibleContexts #-}
+
+-- | When evaluation Sapphire code, this structure keeps track of the context
+--   in which the evaluation happens.  More then just a set of local variables,
+--   this structure also tracks the current continuation and abstracts the
+--   complex rules for sending messages and replying to function found in
+--   COntinuations.hs into a more managable framework.
+--
+--   This module is designed to work primarly with functions who embed a
+--   Context structure in a state monad.  The EvalM monad meets this
+--   qualification but by making it generic, we ensure easy modifactions to both
+--   structures.
+
+module Context 
+  ( Context( self )
+  , dispatchC
+  , dispatchC_
+  , dispatchM
+  , sendC
+  , sendM
+  , replyM
+  , with
+  ) where
+
 import qualified Data.Map as M
 import Control.Monad
-import Control.Monad.Error
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
-import Control.Concurrent.STM
 import Object
-import Object.Graph
 import {-# SOURCE #-} Object.Spawn
 import Continuation (dispatch, send, tail, reply)
-import Var
 
+-- | This structure contains the state of a sapphire evaluation.  It is
+--   generally assumed that this structure will live in a state monad. In order
+--   to enforce a clean interface, only the self field is exposed.
 data Context = Context 
                { locals :: M.Map String Value
                , self :: Object
                , continuation :: Continuation
                }
 
-dispatchC :: Context -> Process -> Message -> IO (Value, Context)
+-- | Send a process a message and wait for the reply. It is possible that the
+--   recieving process will wish to send a message back to the sender (either
+--   directly or indirectly) to prevent deadlocks, it must be possible to
+--   respond to down stream messages while waiting for the response. This in 
+--   turn implies that `self` may be modified by such a message in which case
+--   the expectation is that the sending process will continue with the 
+--   modified version.  This function therefore requires the current context,
+--   and returns a possibilly modified version of that context along with the
+--   response value.
+dispatchC :: Context -- ^ the current Context
+          -> Process -- ^ the process to send the message to
+          -> Message -- ^ The message to be sent
+          -> IO (Value, Context) -- ^ the responce to the message, the updated context
 dispatchC c pid msg= do
   (val, self') <- dispatch (self c) (responderObject) (continuation c) pid msg
   return (val, c{self=self'})
 
+-- | Like dispatchC above, but ignores any changes made to the object itself.
+--   This is primarly used by search functions who can ensure that they are
+--   read-only all the way down the line.
 dispatchC_ :: Context -> Process -> Message -> IO Value
 dispatchC_ c p m = fst `fmap` dispatchC c p m
 
+-- | Send a message to a process and block until it responds.
 dispatchM :: (MonadState Context m, MonadIO m) => Process -> Message -> m Value
 dispatchM pid msg= do
   context <- get
@@ -35,19 +72,24 @@ dispatchM pid msg= do
   put context'
   return val
 
+-- | Send a message to a proces but do not wait for the response.
 sendC :: Context->Process->Message-> IO Replier
 sendC c pid msg = send (continuation c) pid msg
 
+-- | send a message but do not wait for a response
 sendM ::  (MonadState Context m, MonadIO m) => Process -> Message -> m Replier
 sendM pid msg = do
   cont <- gets continuation
   liftIO $ send cont pid msg
 
+-- | Send a response to the calling process. 
 replyM ::  (MonadState Context m, MonadIO m) => Value -> m Bool
 replyM val = do
   cont <- gets continuation
   liftIO $ reply cont val
 
+-- | Evaluate a method with the given object as self.  Returns bother the result
+--   and a potentially modified version of the object.
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
   context <- get
@@ -57,90 +99,16 @@ with obj f = do
   put context
   return (a, obj')
 
-lookupM :: (MonadState Context m, MonadIO m) => Var -> m (Maybe Value)
-lookupM var = get >>= (liftIO . lookup var)
-
-retrieveM ::  (MonadState Context m, MonadIO m) => Var -> m (Maybe Value)
-retrieveM var = do 
-  c <- get  
-  liftIO $ retrieve' var (self c) c
-
-lookup :: Var -> Context -> IO (Maybe Value) --Check Local context
-lookup Self c = return $ Just $ VObject $ self c
-lookup var c = 
-  case  M.lookup (top var) (locals c) of
-    Nothing  ->  lookupIvars var (self c) c-- find in self  
-    Just val -> 
-      case bottom var of 
-        Nothing -> return $ Just val
-	Just var' -> do  --convert var' to object and search there.   
-          obj' <-  valToObj val
-          retrieve' var' obj' c
-
-lookupIvars :: Var -> Object -> Context -> IO (Maybe Value)
-lookupIvars var (Pid pid) c = Just `fmap` dispatchC_ c pid (Search var)
-lookupIvars _ ROOT _ = return Nothing
-lookupIvars var obj c = case M.lookup (top var) (ivars obj) of
-  Nothing  -> lookupCVars var (klass obj) c
-  Just val ->
-    case bottom var of
-      Nothing -> return $ Just val
-      Just var' -> do
-        obj' <- valToObj val
-        retrieve' var' obj' c
-
-lookupCVars :: Var -> Object -> Context -> IO (Maybe Value)
-lookupCVars var (Pid pid) c = Just `fmap` dispatchC_ c pid (SearchClass var)
-lookupCVars var obj@Class {} c = case M.lookup (top var) (cvars obj) of
-  Nothing  -> lookupCVars var (super obj) c
-  Just val -> case (bottom var) of 
-    Nothing   -> return $ Just val
-    Just var' -> do
-      obj' <- valToObj val
-      retrieve' var' obj' c
-lookupCVars _ _ _ = return Nothing
-
-
-retrieve' :: Var -> Object -> Context -> IO (Maybe Value)
-retrieve' var (Pid pid) c = Just `fmap` dispatchC_ c pid (Retrieve var)
-retrieve' _ ROOT _ = return Nothing
-retrieve' var obj c = case M.lookup (top var) (ivars obj) of
-  Nothing  -> return Nothing
-  Just val ->
-    case bottom var of
-      Nothing -> return $ Just val
-      Just var' -> do
-        obj' <- valToObj val
-        retrieve' var' obj' c
-
-insertIVar :: String -> Value -> Context -> Context
-insertIVar s val c@Context{self=obj} = c{self=obj{ivars=(M.insert s val (ivars obj))}}
-
-insertCVarM s val = do
-  c <- get
-  let obj = self c
-  case obj of
-    Class{cvars = cvs} -> do
-      put c{self = obj{cvars = M.insert s val cvs}}
-      return val
-    _ -> throwError "Class opperation performed on non-class object"
-
-insert :: Var -> Value -> Context -> Context
-insert (Var {name=s, scope=[]}) val c@Context {locals=l} =
+-- | Insert a value into the local namespace
+insertLocal :: String -> Value -> Context -> Context
+insertLocal s val c@Context {locals=l} =
   c{locals = M.insert s val l}
 
+-- | when applying a function, add the actual parameters to the local context
+--   by modifying the existing context. Parameters are passed as a list of name
+--   value pairs.
 merge :: [(String,Value)] -> Context -> Context
 merge params  c@Context {locals=l} = 
   c{locals = M.union (M.fromList params) l} 
 
-precedence :: Context -> M.Map Op Precedence
-precedence _ = -- TODO read from Context
-  M.fromList [
-      ("+",(6,L,N))
-    , ("-",(6,L,N))
-    , ("*",(7,L,N))
-    , ("/",(7,L,N))
-    , ("<",(4,N,N))
-    , (">",(4,N,L))
-    , ("==",(4,N,L))
-  ]
+
