@@ -107,6 +107,8 @@ insertIVar _ _ ROOT  = fail "Inserting into ROOT not allowed, (How the hell did 
 insertIVar str val obj@(Pid p) = insertIVarRemote str val p >> return obj
 insertIVar str val obj = return $ obj{ivars= (M.insert str val (ivars obj))}
 
+insertIVarLocal str val obj = obj{ivars= (M.insert str val (ivars obj))}
+
 insertIVarRemote str val p = sendM p (SetIVar str val)
 
 insertCVar :: (MonadState Context m, MonadIO m) => String -> Value -> Object -> m Object
@@ -114,6 +116,9 @@ insertCVar _ _ ROOT = fail "Inserting into ROOT not allowed, (How the hell did y
 insertCVar str val obj@(Pid p) = insertCVarRemote str val p >> return obj
 insertCVar str val obj@Class{} = return $ obj{cvars= (M.insert str val (cvars obj))}
 insertCVar _ _ obj  = fail "This Object is not a Class.  You cannot set a CVar in it"
+
+insertCVarLocal str val obj@Class{} =  obj{cvars= (M.insert str val (cvars obj))}
+insertCVarLocal _ _ _  = error "This Object is not a Class.  You cannot set a CVar in it"
 
 insertCVarRemote str val p = sendM p (SetCVar str val)
 

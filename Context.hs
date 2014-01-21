@@ -22,6 +22,7 @@ module Context
   , sendM
   , replyM
   , with
+  , newContext
   , lookupLocals
   , insertLocals
   ) where
@@ -31,7 +32,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Object
-import Continuation (dispatch, send, tail, reply)
+import Continuation (dispatch, send, tail, reply, newContIO)
 
 -- | This structure contains the state of a sapphire evaluation.  It is
 --   generally assumed that this structure will live in a state monad. In order
@@ -42,6 +43,17 @@ data Context = Context
                , continuation :: Continuation
                , responder :: Responder
                }
+
+newContext obj cont resp = Context
+  { locals = M.empty
+  , self = obj
+  , continuation = cont
+  , responder = resp
+  }
+
+newContextIO obj resp = do
+  cont <- newContIO
+  return $ newContext obj cont resp
 
 -- | Send a process a message and wait for the reply. It is possible that the
 --   recieving process will wish to send a message back to the sender (either

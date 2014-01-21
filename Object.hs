@@ -1,3 +1,5 @@
+-- Object.hs Copyright 2013, 2014 John F. Miller
+
 module Object where
 
 import qualified Data.Text as T

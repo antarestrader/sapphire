@@ -11,6 +11,7 @@ import AST
 import Var
 import Context
 import qualified Data.Map as M
+import Control.Monad.Error.Class
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
@@ -36,9 +37,13 @@ responderObject :: C.Responder Object Message Value
 responderObject obj msg =
   case fst msg of
     Eval        exp -> evaluate exp obj (snd msg)
-    Search      var -> search var obj (snd msg)   >>  return obj
-    SearchClass var -> search' var obj  (snd msg)  >>  return obj
-    Retrieve    var -> retrieve var obj  (snd msg) >>  return obj
+    SearchIVars str -> do
+      case (lookupIVarsLocal str obj) of
+        Nothing -> C.reply (snd msg) (VError "not found") >> return obj
+        Just v  -> C.reply (snd msg) v >> return obj
+    SearchCVars str -> undefined -- TODO
+    SetIVar str val -> C.reply (snd msg) val >> (return $ insertIVarLocal str val obj)
+    SetCVar str val -> C.reply (snd msg) val >> (return $ insertCVarLocal str val obj)
     Execute     var args  -> call obj var args (snd msg)
     Initialize  pid -> do
       obj' <- initialize pid obj
@@ -52,23 +57,24 @@ initialize pid obj = do
 
 evaluate :: Exp -> Object -> Continuation -> IO Object
 evaluate exp obj cont = do
-  let context = Context {locals = M.empty, self = obj, continuation = cont}
+  let context = newContext obj cont responderObject
   result <- runEvalM (eval exp) context
   case result of 
-    Left  err -> fail err --Todo Handle Errors
-    Right (val,Context {self = obj'}) -> C.reply cont val >> return obj'  -- not proper tail call
+    Left  err -> C.reply cont (VError err) >> return obj
+    Right (val,context) -> C.reply cont val >> return (self context)  -- not proper tail call
 
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
-  let context = Context {locals = M.empty, self = obj, continuation = cont}
-  method <- lookup var  context
-  result <- case method of 
-    Just (VFunction fn _) -> runEvalM (fn args) context
-    Nothing ->  return $ Left $ "Method missing" ++ show var
-    _ -> return $ Left "Method cast not yet implimented"
+  let context =  newContext obj cont responderObject
+  result <- flip runEvalM context $ do
+    method <- lookupVar var
+    case method of 
+      (VFunction fn _) -> fn args
+      (VError _ ) ->  throwError $  "Method missing" ++ show var
+      _ -> throwError "Method cast not yet implimented"
   case result of
         Left  err -> (C.reply cont (VError err)) >> return obj
-        Right (val,Context{self=obj'}) -> (C.reply cont val) >> return obj' 
+        Right (val,context) -> (C.reply cont val) >> return (self context) 
 
 
 
