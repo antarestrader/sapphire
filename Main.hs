@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import LineParser (parseCode)
 import Tokens
 import Object
+import Object.Spawn (responderObject)
 import AST
 import Parser
 import Eval
@@ -18,8 +19,7 @@ import Text.Regex.Posix
 main :: IO ()
 main = do
   main <- boot
-  cont <- newContIO
-  let context = Context {locals = M.empty, self=main, continuation = cont}
+  context <- newContextIO main responderObject
   repl context
  
 repl :: Context -> IO ()

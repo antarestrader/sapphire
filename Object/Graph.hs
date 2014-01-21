@@ -100,7 +100,8 @@ insertLHS (LIVar str) val = do
   context <-  get
   slf'  <- insertIVar str val (self context)
   put context{self=slf'}
-insertLVar (LVar (Var str [])) val = modify $ insertLocals str val
+insertLHS (LVar (Var str [])) val = modify $ insertLocals str val
+-- TODO: Other LHS Cases here
 
 insertIVar :: (MonadState Context m, MonadIO m) => String -> Value -> Object -> m Object
 insertIVar _ _ ROOT  = fail "Inserting into ROOT not allowed, (How the hell did you get your hands on ROOT?)"

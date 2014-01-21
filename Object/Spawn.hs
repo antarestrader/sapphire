@@ -1,6 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Object.Spawn where
+module Object.Spawn (
+    spawn
+  , responderObject 
+  )
+where
 
 import Prelude hiding (lookup)
 import qualified Continuation as C

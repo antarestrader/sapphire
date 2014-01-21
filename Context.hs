@@ -23,8 +23,10 @@ module Context
   , replyM
   , with
   , newContext
+  , newContextIO
   , lookupLocals
   , insertLocals
+  , merge
   ) where
 
 import qualified Data.Map as M

@@ -1,3 +1,4 @@
+-- Copyright 2013, 2014 John F. Miller
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Eval (
@@ -11,16 +12,13 @@ where
 import qualified Data.Map as M
 import AST
 import Object
+import Object.Graph
 import Object.Spawn
 import Context
 import Var
-import Continuation(reply)
-import Prelude hiding (lookup) 
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
-import Control.Concurrent.STM
-import Control.Concurrent.STM.TChan
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
@@ -46,7 +44,7 @@ eval ENil = return VNil
 eval ETrue = return VTrue
 eval EFalse = return VFalse
 eval (EIVar s) = do
-  val' <- retrieveM $ simple s
+  val' <- gets self >>= lookupIVarsM s 
   case val' of
     Just val -> return val
     Nothing  ->return VNil
@@ -54,22 +52,10 @@ eval (EAtom a) = return (VAtom a)
 eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
-eval (EVar var) = do
-  val' <- lookupM var
-  case val' of
-    Just val -> return val
-    Nothing  -> throwError $ "Not in scope: " ++ (show var)
-eval (Assign (LVar var) exp) = do
+eval (EVar var) = lookupVar var
+eval (Assign lhs exp) = do
   val <- eval exp
-  modify (insert var val)
-  return val
-eval (Assign (LIVar s) exp) = do
-  val <- eval exp
-  modify (insertIVar s val)
-  return val
-eval (Assign (LCVar s) exp) = do
-  val <- eval exp
-  insertCVarM s val
+  insertLHS lhs val
   return val
 
 eval (Call expr msg args) = do
@@ -80,7 +66,7 @@ eval (Call expr msg args) = do
         vals <- mapM eval args
         dispatchM pid (Execute (simple msg) vals)
     receiver -> do
-      method <- get >>= liftIO . lookupIvars (simple msg) receiver
+      method <- lookupIVarsM msg receiver
       case method of
         Nothing -> throwError $ "Method not found: " ++ msg
         Just (VFunction fn arity) -> do -- eval args and call function
@@ -92,15 +78,14 @@ eval (Call expr msg args) = do
         Just _ -> throwError $ "Not Implemented: cast to functions"
 
 eval (Apply var argExprs) = do
-  fn <- get >>= (liftIO  . lookup var)
+  fn <- lookupVar var
   case fn of
-    Nothing -> throwError $ "Not in scope: " ++ (show var)
-    Just (VFunction f arity) -> if checkArity arity (length argExprs) 
+    (VFunction f arity) -> if checkArity arity (length argExprs) 
       then mapM eval argExprs >>= f
       else throwError $
           "Arity Mismatch on function " ++ show var ++ 
 	  " with " ++ show (length argExprs) ++" arguments."
-    Just val -> eval (Call (EValue val) "call" argExprs)
+    val -> eval (Call (EValue val) "call" argExprs)
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
 eval (Define lhs params exp) = eval $ Assign lhs (Lambda params exp)
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (length params, Just $ length params)) -- no varargs for now
