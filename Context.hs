@@ -22,6 +22,8 @@ module Context
   , sendM
   , replyM
   , with
+  , lookupLocals
+  , insertLocals
   ) where
 
 import qualified Data.Map as M
@@ -29,7 +31,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Object
-import {-# SOURCE #-} Object.Spawn
 import Continuation (dispatch, send, tail, reply)
 
 -- | This structure contains the state of a sapphire evaluation.  It is
@@ -39,6 +40,7 @@ data Context = Context
                { locals :: M.Map String Value
                , self :: Object
                , continuation :: Continuation
+               , responder :: Responder
                }
 
 -- | Send a process a message and wait for the reply. It is possible that the
@@ -55,7 +57,7 @@ dispatchC :: Context -- ^ the current Context
           -> Message -- ^ The message to be sent
           -> IO (Value, Context) -- ^ the responce to the message, the updated context
 dispatchC c pid msg= do
-  (val, self') <- dispatch (self c) (responderObject) (continuation c) pid msg
+  (val, self') <- dispatch (self c) (responder c) (continuation c) pid msg
   return (val, c{self=self'})
 
 -- | Like dispatchC above, but ignores any changes made to the object itself.
@@ -82,6 +84,8 @@ sendM pid msg = do
   cont <- gets continuation
   liftIO $ send cont pid msg
 
+-- TODO modifySelf, modifySelfM 
+
 -- | Send a response to the calling process. 
 replyM ::  (MonadState Context m, MonadIO m) => Value -> m Bool
 replyM val = do
@@ -99,9 +103,12 @@ with obj f = do
   put context
   return (a, obj')
 
+lookupLocals :: String -> Context -> Maybe Value
+lookupLocals s Context{locals = l} = M.lookup s l
+
 -- | Insert a value into the local namespace
-insertLocal :: String -> Value -> Context -> Context
-insertLocal s val c@Context {locals=l} =
+insertLocals :: String -> Value -> Context -> Context
+insertLocals s val c@Context {locals=l} =
   c{locals = M.insert s val l}
 
 -- | when applying a function, add the actual parameters to the local context

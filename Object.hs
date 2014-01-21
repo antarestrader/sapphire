@@ -55,7 +55,7 @@ checkArity (min, Just max) x | (min <= x) && (x <= max) = True
 checkArity (min, Nothing)  x | (min <= x) = True
 checkArity _ _ = False
 
-data SapString = SapString {encoding :: String, esscapes :: [String], text :: T.Text } deriving Eq --FixMe
+data SapString = SapString {encoding :: String, esscapes :: [String], text :: T.Text } deriving Eq --TODO FixMe
 
 type Precedence = (Int, AssocLR, AssocLR)
 
@@ -80,9 +80,10 @@ data Object = Pid Process
 
 data Message =
     Execute Var [Value] -- ^ may want ot make this strict in value
-  | Search Var  -- ^  check only ivars move to klass w/ search
-  | SearchClass Var  -- ^ check only cvars move to super class
-  | Retrieve Var  -- ^ when scopped, look only in ivars no graph search
+  | SearchIVars String
+  | SearchCVars String -- ^ Including modules and super-classes
+  | SetIVar String Value
+  | SetCVar String Value
   | Eval Exp 
   | Initialize Process -- ^ Set process to Pid and call initialization method
   | Terminate
@@ -90,10 +91,7 @@ data Message =
 type Continuation = C.Continuation Message Value
 type Process = C.ProcessId Message Value
 type Replier = C.Replier Value
-
-valToObj :: Value -> IO Object
-valToObj (VObject obj) = return obj
-valToObj _ = fail "Primitive to Object maping not implimented yet"
+type Responder = C.Responder Object Message Value
 
 thread :: Object -> String  -- for debugging purposes only
 thread (Pid pid) = show $ fst pid
