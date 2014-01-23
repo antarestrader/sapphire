@@ -45,7 +45,12 @@ responderObject obj msg =
       case (lookupIVarsLocal str obj) of
         Nothing -> C.reply (snd msg) (VError "not found") >> return obj
         Just v  -> C.reply (snd msg) v >> return obj
-    SearchCVars str -> undefined -- TODO
+    SearchCVars str -> do
+      case (lookupCVarsLocal str obj) of
+        Just v  -> C.reply (snd msg) v >> return obj
+	Nothing -> case (super obj) of 
+	  ROOT -> C.reply (snd msg) (VError "Not Found") >> return obj
+	  (Pid process) -> C.tail (snd msg) process (SearchCVars str) >> return obj
     SetIVar str val -> C.reply (snd msg) val >> (return $ insertIVarLocal str val obj)
     SetCVar str val -> C.reply (snd msg) val >> (return $ insertCVarLocal str val obj)
     Execute     var args  -> call obj var args (snd msg)

@@ -47,10 +47,9 @@ lookupCVars s obj context = case lookupCVarsLocal s obj of
 
 lookupCVarsM str obj = get >>= liftIO . lookupCVars str obj
 
--- TODO adjust CVars to take advantage of tail calls
 lookupCVarsRemote :: String -> Process -> Context -> IO (Maybe Value)
 lookupCVarsRemote s process context = do
-  val <- dispatchC_ context process (SearchCVars s)
+  val <- dispatchC_ context process (SearchCVars s) -- NOTE: Tail call done in responder
   case val of
     VError _ -> return Nothing
     val' -> return $ Just val'
