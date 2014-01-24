@@ -11,7 +11,10 @@ import Var
 import qualified Continuation as C
 import Data.Maybe
 
-type Fn = [Value] -> EvalM Value
+-- | The type of function values in sapphire
+--   to enable proper tail calls function must reply to the context rather than
+--   return a value.
+type Fn = [Value] -> EvalM ()
 
 data Value =
     VInt Integer

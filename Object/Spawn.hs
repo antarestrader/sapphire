@@ -75,15 +75,7 @@ evaluate exp obj cont = do
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   let context =  newContext obj cont responderObject
-  result <- flip runEvalM context $ do
-    method <- lookupVar var
-    case method of 
-      (VFunction fn _) -> fn args
-      (VError _ ) ->  throwError $  "Method missing" ++ show var
-      _ -> throwError "Method cast not yet implimented"
+  result <- runEvalM (evalT $ Apply var $ map EValue args) context  
   case result of
-        Left  err -> (C.reply cont (VError err)) >> return obj
-        Right (val,context) -> (C.reply cont val) >> return (self context) 
-
-
-
+    Left  err -> (C.reply cont (VError err)) >> return obj
+    Right ((),context) -> return (self context) 

@@ -20,21 +20,27 @@ module Context
   , dispatchM
   , sendC
   , sendM
-  , replyM
+  , tailC, tailM
+  , replyM, replyM_
   , with
   , newContext
   , newContextIO
   , lookupLocals
   , insertLocals
   , merge
+  , hasReply, canReply
+  , extract
   ) where
 
+import Prelude hiding (tail)
 import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TMVar
 import Object
-import Continuation (dispatch, send, tail, reply, newContIO)
+import Continuation hiding (Responder, Message, Continuation, Replier)
 
 -- | This structure contains the state of a sapphire evaluation.  It is
 --   generally assumed that this structure will live in a state monad. In order
@@ -98,13 +104,48 @@ sendM pid msg = do
   cont <- gets continuation
   liftIO $ send cont pid msg
 
+tailC :: Context->Process->Message-> IO ()
+tailC c pid msg = tail (continuation c) pid msg
+
+tailM :: (MonadState Context m, MonadIO m) => Process -> Message -> m ()
+tailM pid msg = do
+  cont <- gets continuation
+  liftIO $ tail cont pid msg
+
 -- TODO modifySelf, modifySelfM 
 
--- | Send a response to the calling process. 
+-- | Send a response to the calling process if no response has yet been given.
+--   Returns true if the response was sent, false if a previous value had been
+--   placed in the reply.
 replyM ::  (MonadState Context m, MonadIO m) => Value -> m Bool
 replyM val = do
   cont <- gets continuation
   liftIO $ reply cont val
+
+-- | Send a response to the calling process like replyM, but with a unit return.
+replyM_ val = replyM val >> return ()
+
+-- | True if a reply has been given already, false if a reply is still needed
+hasReply :: (MonadState Context m, MonadIO m) => m Bool
+hasReply = gets continuation >>= liftIO . isEmpty
+
+-- | The logical opposite of hasReply.  True if a reply is still needed, false
+--   if one has already been given.
+canReply :: (MonadState Context m, MonadIO m, Functor m) => m Bool
+canReply = not `fmap` hasReply
+
+-- | Given an action that sets a reply value, run that action capturing the 
+--   reply value.  This replaces the replier with a temporary one so the reply
+--   is not propigated to the outside context.
+extract :: (MonadState Context m, MonadIO m) => m () -> m Value
+extract act = do
+  cOld@Context{continuation = cont} <- get
+  r <- liftIO newEmptyTMVarIO
+  let cNew = cOld{continuation = cont{replier = r}}
+  put cNew
+  act
+  put cOld{self = (self cNew)}
+  liftIO $ atomically $ readTMVar r
 
 -- | Evaluate a method with the given object as self.  Returns bother the result
 --   and a potentially modified version of the object.

@@ -8,7 +8,7 @@ module Continuation
   , ProcessId
   , Responder
   , Replier
-  , Continuation
+  , Continuation (..)
   , newContIO
   , send
   , tail
@@ -18,6 +18,7 @@ module Continuation
   , newMessageQueue
   , readQueue
   , respondWith
+  , isEmpty
   )where
 
 import Prelude hiding (tail)
@@ -121,6 +122,9 @@ dispatch obj responder cont pid msg = do
 -- | send this reply to the message
 reply ::  Continuation m r -> r -> IO Bool
 reply cont val= atomically $ tryPutTMVar (replier cont) val
+
+isEmpty :: Continuation m r -> IO Bool
+isEmpty cont = atomically $ isEmptyTMVar $ replier cont
 
 -- | cont list may become smarter (i.e Data.Map)
 emptyContList :: ContList m r

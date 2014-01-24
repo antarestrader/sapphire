@@ -1,15 +1,18 @@
 -- Copyright 2013, 2014 John F. Miller
 {-# LANGUAGE ScopedTypeVariables #-}
 
+
 module Eval (
     EvalM
   , Err
   , runEvalM
   , eval
+  , evalT
   )
 where
 
 import qualified Data.Map as M
+import Data.Maybe
 import AST
 import Object
 import Object.Graph
@@ -43,16 +46,17 @@ eval (EFloat f) = return (VFloat f)
 eval ENil = return VNil
 eval ETrue = return VTrue
 eval EFalse = return VFalse
-eval (EIVar s) = do
-  val' <- gets self >>= lookupIVarsM s 
-  case val' of
-    Just val -> return val
-    Nothing  ->return VNil
 eval (EAtom a) = return (VAtom a)
+
+eval (EIVar s) = do
+  val <- gets self >>= lookupIVarsM s 
+  return $ maybe VNil id val
+eval (EVar var) = lookupVar var
+
 eval (OpStr a ops) = do
   c <- get
   eval (shunt (precedence c) [a] [] ops)
-eval (EVar var) = lookupVar var
+
 eval (Assign lhs exp) = do
   val <- eval exp
   insertLHS lhs val
@@ -61,41 +65,31 @@ eval (Assign lhs exp) = do
 eval (Call expr msg args) = do
   val <- eval expr
   r <- liftIO $ valToObj val
+  vals <- mapM eval args
   case r of 
-    Pid pid -> do -- Remote process send a message
-        vals <- mapM eval args
-        dispatchM pid (Execute (simple msg) vals)
-    receiver -> do
-      method <- lookupIVarsM msg receiver
-      case method of
-        Nothing -> throwError $ "Method not found: " ++ msg
-        Just (VFunction fn arity) -> do -- eval args and call function
-          guard $ checkArity arity $ length args 
-          vals <- mapM eval args
-          (result, obj') <- with receiver (fn vals)
-          -- TODO: Put obj' back
-          return result
-        Just _ -> throwError $ "Not Implemented: cast to functions"
+    Pid pid -> dispatchM pid (Execute (simple msg) vals)
+    receiver -> fmap fst $ with receiver $ do 
+      (method, arity) <- fnFromVar (simple msg)
+      guard $ checkArity arity $ length vals
+      extract $ method vals -- proper tail calls here
+    -- TODO put self back (see issue #28 on github)
 
-eval (Apply var argExprs) = do
-  fn <- lookupVar var
-  case fn of
-    (VFunction f arity) -> if checkArity arity (length argExprs) 
-      then mapM eval argExprs >>= f
-      else throwError $
-          "Arity Mismatch on function " ++ show var ++ 
-	  " with " ++ show (length argExprs) ++" arguments."
-    val -> eval (Call (EValue val) "call" argExprs)
+eval (Apply var args) = do
+  (fn, arity) <- fnFromVar var
+  guard $ checkArity arity $ length args
+  vals <- mapM eval args
+  extract $ fn vals -- extract impliments proper tail recursion
+
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
 eval (Define lhs params exp) = eval $ Assign lhs (Lambda params exp)
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (length params, Just $ length params)) -- no varargs for now
+
 eval (Block exps) = fmap last $ mapM eval exps
-eval (If pred cons (Just alt)) = do
+
+eval (If pred cons alt) = do
   r <- eval pred
-  if r == VNil || r == VFalse then eval alt else eval cons
-eval (If pred cons Nothing) = do
-  r <- eval pred
-  if r == VNil || r == VFalse then return VNil else eval cons
+  if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
+
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
   case cls of 
@@ -103,6 +97,43 @@ eval (EClass n super exp) = do
     VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
  			   
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
+
+
+-- | Eval with tail calls
+--   Like @eval@ but places the result in the the response of the continuation
+--   rather then return them as the result.  This allows for proper tail 
+--   recursion.  Most cases are handled by calling back to eval, but those
+--   that are suseptable to tail recursion are reimplimented here.
+evalT ::  Exp -> EvalM ()
+evalT (Apply var args) = do
+  (fn, arity) <- fnFromVar var
+  guard $ checkArity arity $ length args
+  vals <- mapM eval args
+  fn vals
+evalT (Call  expr msg args) = do
+  val <- eval expr
+  r <- liftIO $ valToObj val
+  vals <- mapM eval args
+  case r of 
+    Pid pid -> tailM pid (Execute (simple msg) vals)
+    receiver -> fmap fst $ with receiver $ do 
+      (method, arity) <- fnFromVar (simple msg)
+      guard $ checkArity arity $ length vals
+      method vals
+    -- TODO put self back (see issue #28 on github)
+evalT (If pred cons alt) = do
+  r <- eval pred
+  if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
+evalT exp = eval exp >>= replyM_  -- General case
+
+
+fnFromVar :: Var -> EvalM (Fn, Arity)
+fnFromVar var = do
+  val <- lookupVar var
+  case val of
+    (VFunction fn arity) -> return (fn, arity)
+    (VError _) -> throwError $ "Function or Method not found: " ++ show var
+    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (1,Nothing))
 
 buildClass n super exp = do
   VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
@@ -122,10 +153,10 @@ buildClass n super exp = do
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid]
   return $ VObject $ Pid pid
 
-mkFunct :: [String] -> Exp -> [Value] -> EvalM Value
+mkFunct :: [String] -> Exp -> [Value] -> EvalM ()
 mkFunct params exp vals = do
   c <- get
-  using (merge (zip params vals) c) (eval exp)
+  using (merge (zip params vals) c) (evalT exp) -- Use evalT for proper tail calls
 
 using :: Context -> EvalM a -> EvalM a
 using c evalm = do
@@ -136,11 +167,14 @@ using c evalm = do
   put cOld{self = (slf)}
   return resp
 
-
 -- Impliments the Shunting-yard Algorithm
 -- of Edsger Dijstra as described at
 -- http://www.wcipeg.com/wiki/Shunting_yard_algorithm
-shunt :: (M.Map Op Precedence)  -> [Exp] -> [(Op,Precedence)] -> [(Op,Exp)] -> Exp
+shunt :: (M.Map Op Precedence) -- the operator presedence table 
+      -> [Exp]                 -- the expression stack (preload with first expression)
+      -> [(Op,Precedence)]     -- the operator stack (initially empty)
+      -> [(Op,Exp)]            -- the input stack (initially the all op exp pairs)
+      -> Exp                   -- the resulting expression tree
 -- When the input and operator stacks are empty, the expression stack contains the result
 shunt _ [exp] [] [] = exp
 -- When the input stack is empty, Pop the remaining operators in order

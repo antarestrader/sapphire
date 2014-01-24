@@ -1,4 +1,8 @@
+-- Copyright 2013, 2014 John F. Miller
 {-# Language RankNTypes #-}
+
+-- | All Functions that are primitive to the sapphire and must be provided by
+--   the run time system.
 module BuiltinFunctions where
 
 import Control.Monad.Error
@@ -9,31 +13,32 @@ import qualified Object.Spawn as S
 import Eval
 import Context
 
-binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM Value
-binop op [VFloat a, VFloat b] = return $ VFloat (a `op` b)
-binop op [VInt   a, VFloat b] = return $ VFloat (fromInteger a `op` b)
-binop op [VFloat a, VInt   b] = return $ VFloat (a `op` fromInteger b)
-binop op [VInt   a, VInt   b] = return $ VInt   (a `op` b)
-binop op [_,_] = throwError "Currently only adding numbers"
+binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM ()
+binop op [VFloat a, VFloat b] = replyM_ $ VFloat (a `op` b)
+binop op [VInt   a, VFloat b] = replyM_ $ VFloat (fromInteger a `op` b)
+binop op [VFloat a, VInt   b] = replyM_ $ VFloat (a `op` fromInteger b)
+binop op [VInt   a, VInt   b] = replyM_ $ VInt   (a `op` b)
+binop op [_,_] = throwError "Attempting to add non numeric data"
 binop op _ = throwError "Arity Error: Add takes 2 arguments"
 
 add  = binop (+)
 sub  = binop (-)
 mult = binop (*)
 
-puts vals = liftIO $ mapM_ print vals >> return VNil
+puts :: [Value] -> EvalM ()
+puts vals = (liftIO $ mapM_ print vals) >> replyM_ VNil
 
-cls [] = gets (klass . self) >>= (return . VObject)
+cls [] = gets (klass . self) >>= (replyM_ . VObject)
 
 setClass [VObject cls] = do
   slf <- gets self
   modify (\c -> c{self=slf{klass=cls}})
-  return VNil
+  replyM_ VNil
 
 setCVar [VAtom n,val] = do
   slf <- gets self
   modify (\c -> c{self=slf{cvars = M.insert n val (cvars slf)}})
-  return val
+  replyM_ val
 
 new [] = do
   slf <- gets self
@@ -44,8 +49,8 @@ new [] = do
     , process = Nothing
     }
   -- initialize here
-  return obj
+  replyM_ obj
 
 spawn xs = do
-  obj <- new xs >>= liftIO . S.spawn
-  return $ VObject obj
+  obj <- (extract $ new xs) >>= (liftIO . S.spawn)
+  replyM_ $ VObject obj

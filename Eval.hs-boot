@@ -12,4 +12,5 @@ type EvalM a= StateT Context (ErrorT Err IO) a
 
 runEvalM :: (EvalM a) -> Context -> IO (Either Err (a, Context))
 
-eval :: Exp -> EvalM Value
+eval  ::  Exp -> EvalM Value
+evalT ::  Exp -> EvalM ()
