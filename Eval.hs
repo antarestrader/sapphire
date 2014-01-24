@@ -1,6 +1,28 @@
 -- Copyright 2013, 2014 John F. Miller
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Evaluate the Abstract Syntax Tree expression to produce values within the
+--   the context of the EvalM Monad
+--
+--  In sapphire this is accomplished by a rather bastardized version of
+--  continuation passing style.  In our case continuations are a datastructure
+--  (found in Continuation.hs) that holds a (TMVar Value).  This is the
+--  equivelent of the return site in traditionla CPS.
+--  
+--  In order for this to actually be effective, we needed to change function
+--  application from a function takeing a list of values and returning a
+--  Monadic value result to a function taking a list of values that has re
+--  effect (monadic action) of placing a value in the replier TMVar in the
+--  current context.
+--  
+--  In point of fact most of `eval` is simple translation from Exp to Value.
+--  There are also occasions when we need an actual value to be returned.  for
+--  these reasons, eval was not replaced, but suplimented wiht the evalT
+--  function which can be called whenever it is appropriate to reply with the
+--  resulting value rather then retuning it to the calling function.  The
+--  default implimentation of this function is to call eval and place the
+--  resulting into the replier of context.  For expressions such as apply and
+--  call where proper tail calls are in order evalT reimpliments them.
 
 module Eval (
     EvalM
@@ -28,9 +50,14 @@ import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 type Err = String
 
+-- | The moand in which Sapphire code runs.  It contains the Context, handles
+--   errors and allows for IO actions in the running program.
 type EvalM a= StateT Context (ErrorT Err IO) a
 
-runEvalM :: (EvalM a) -> Context -> IO (Either Err (a, Context))
+-- | execute the EvalM action using the provided Context.
+runEvalM :: (EvalM a) -- ^ the action to be run 
+         -> Context   -- ^ the context to run it in
+         -> IO (Either Err (a, Context))
 runEvalM e c = do
   r <- try $ runErrorT $ runStateT e c
   case r of 
@@ -121,12 +148,22 @@ evalT (Call  expr msg args) = do
       guard $ checkArity arity $ length vals
       method vals
     -- TODO put self back (see issue #28 on github)
+evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exprs) 
 evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
 evalT exp = eval exp >>= replyM_  -- General case
 
-
+-- | Given a Var find or create a function to call
+--
+-- In the most obvios case, we look up the Var in the current context and
+-- find a function value which we shall return directly.
+-- 
+-- In the case of an error we propigate the not found signal and move on.
+--
+-- When we encounter a non-function value, we create a temporary function
+-- which uses the "call" method.  By implimenting this method, any object
+-- can pretend to be a function.
 fnFromVar :: Var -> EvalM (Fn, Arity)
 fnFromVar var = do
   val <- lookupVar var
@@ -135,6 +172,15 @@ fnFromVar var = do
     (VError _) -> throwError $ "Function or Method not found: " ++ show var
     val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (1,Nothing))
 
+-- | The inner workings of Class creation
+--
+-- If a super class is not given we assume Object by default; every class is an
+-- instance of Classs. The class structure is built and a new class is spawned.
+-- Becase classes are by defination shared information among all their 
+-- instances, every class must have its own process.
+--
+-- All classes are registered by their proper name in Object or the containing
+-- module once implimented.
 buildClass n super exp = do
   VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
   VObject clsClass <- eval (EVar $ simple "Class")
@@ -151,13 +197,22 @@ buildClass n super exp = do
   Pid pid <- liftIO $ spawn cls
   sendM pid $ Eval exp
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid]
+
   return $ VObject $ Pid pid
 
-mkFunct :: [String] -> Exp -> [Value] -> EvalM ()
+-- | The internal working so making a function
+mkFunct :: [String]  -- formal parameters (TODO improve see issue #29)
+        -> Exp       -- the expression to be evaluated (typically a block)
+        -> [Value]   -- the actual parameters
+        -> EvalM ()  -- the resulting value is placed in the replier
 mkFunct params exp vals = do
   c <- get
   using (merge (zip params vals) c) (evalT exp) -- Use evalT for proper tail calls
 
+-- | Part of the process of applying a function is to set the formal parameters
+--   equal to the actual parameters.  Once accomplished, a new context is
+--   created.  This function allows that new context to be safely used and then
+--   discarded.
 using :: Context -> EvalM a -> EvalM a
 using c evalm = do
   cOld <- get
@@ -197,11 +252,9 @@ shunt c xs ys ((op,x):ops) =
       p = findOp c op
 shunt _ xs ys ops = error $ "Shunting Yard Algorithm bug:\n" ++ show xs ++ ('\n':show ys) ++ ('\n':show ops)
 
-
 findOp c op = maybe (5,L,L) id (M.lookup op c)
 
 makeOpExpr :: Precedence -> Exp -> Exp -> Op -> Exp
 makeOpExpr (_,_,L) l r op = (Call l op [r])
 makeOpExpr (_,_,R) l r op = (Call r op [l])
 makeOpExpr (_,_,N) l r op = (Apply (Var {name=op, scope=[]}) [l,r])
-
