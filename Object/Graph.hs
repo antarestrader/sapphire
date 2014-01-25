@@ -12,6 +12,7 @@ import Context
 import Object
 import Var
 import AST
+import {-# SOURCE #-} Eval
 import Control.Monad.IO.Class
 import Control.Monad.Error.Class
 import Control.Monad.State.Class
@@ -59,7 +60,7 @@ lookupCVarsLocal _ ROOT = Nothing
 lookupCVarsLocal _ (Pid _) = error "lookupCVarsLocal called with remote object"
 lookupCVarsLocal s obj = M.lookup s (cvars obj)
 
-lookupVar ::(MonadIO m, MonadState Context m, MonadError String m) => Var -> m Value
+lookupVar :: Var -> EvalM Value
 lookupVar var = do
   context <- get
   let str = top var
@@ -83,7 +84,7 @@ lookupVar var = do
       obj <- valToObj val
       lookupVarForObj var' obj
 
-lookupVarForObj :: (MonadIO m, MonadState Context m, MonadError String m) => Var -> Object -> m Value
+lookupVarForObj :: Var -> Object -> EvalM Value
 lookupVarForObj var obj = do
   let str = top var
   val <- lookupIVarsM str obj
@@ -94,16 +95,21 @@ lookupVarForObj var obj = do
     (Nothing, Just _)   -> throwError $ str ++" not found"
 
 
-insertLHS :: (MonadState Context m, MonadIO m) => LHS -> Value -> m ()
+insertLHS :: LHS -> Value -> EvalM ()
 insertLHS (LIVar str) val = do
   context <-  get
   slf'  <- insertIVar str val (self context)
   put context{self=slf'}
 insertLHS (LVar (Var str [])) val = modify $ insertLocals str val
+insertLHS (LCVar str) val = do
+  context <- get
+  slf' <- insertCVar str val (self context)
+  put context{self=slf'}
+insertLHS _ _ = throwError "I dont know how to assign to that value"
 -- TODO: Other LHS Cases here
 
-insertIVar :: (MonadState Context m, MonadIO m) => String -> Value -> Object -> m Object
-insertIVar _ _ ROOT  = fail "Inserting into ROOT not allowed, (How the hell did you get your hands on ROOT?)"
+insertIVar :: String -> Value -> Object -> EvalM Object
+insertIVar _ _ ROOT  = throwError $ "Inserting into ROOT not allowed, (How the hell did you get your hands on ROOT?)"
 insertIVar str val obj@(Pid p) = insertIVarRemote str val p >> return obj
 insertIVar str val obj = return $ obj{ivars= (M.insert str val (ivars obj))}
 
@@ -111,20 +117,40 @@ insertIVarLocal str val obj = obj{ivars= (M.insert str val (ivars obj))}
 
 insertIVarRemote str val p = sendM p (SetIVar str val)
 
-insertCVar :: (MonadState Context m, MonadIO m) => String -> Value -> Object -> m Object
+insertCVar :: String -> Value -> Object -> EvalM Object
 insertCVar _ _ ROOT = fail "Inserting into ROOT not allowed, (How the hell did you get your hands on ROOT?)"
 insertCVar str val obj@(Pid p) = insertCVarRemote str val p >> return obj
 insertCVar str val obj@Class{} = return $ obj{cvars= (M.insert str val (cvars obj))}
-insertCVar _ _ obj  = fail "This Object is not a Class.  You cannot set a CVar in it"
+insertCVar _ _ obj  = throwError "This Object is not a Class.  You cannot set a CVar in it"
 
 insertCVarLocal str val obj@Class{} =  obj{cvars= (M.insert str val (cvars obj))}
 insertCVarLocal _ _ _  = error "This Object is not a Class.  You cannot set a CVar in it"
 
 insertCVarRemote str val p = sendM p (SetCVar str val)
 
-valToObj :: Monad m => Value -> m Object
+valToObj :: Value -> EvalM Object
 valToObj (VObject obj) = return obj
-valToObj _ = fail "Primitive to Object maping not implimented yet"
+valToObj val@(VInt _) = do
+  cls <- getPrimClass "Number" 
+  return $ buildPrimInstance cls val
+valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
+
+getPrimClass :: String -> EvalM Object
+getPrimClass str = do
+  cls' <- (eval $ EVar $ simple "Number")
+  case cls' of
+    (VObject obj) -> return obj
+    _ -> throwError $ "System Error: Primitive class not found: " ++ str
+
+buildPrimInstance :: Object -- the class
+                  -> Value  -- the value
+                  -> Object
+buildPrimInstance cls val = Object 
+                          { ivars = M.singleton "__value" val
+                          , klass = cls
+                          , modules = []
+                          , process = Nothing
+                          }
 
 precedence :: Context -> M.Map Op Precedence
 precedence _ = -- TODO read from Context

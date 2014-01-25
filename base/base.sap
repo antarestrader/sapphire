@@ -1,0 +1,12 @@
+class Number
+  def add(y)
+    @__value + y
+
+  def sub(y)
+    @__value - y
+
+  def neg
+    0 - @__value
+
+  def call(y)
+    @__value * y

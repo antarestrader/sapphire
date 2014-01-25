@@ -91,7 +91,7 @@ eval (Assign lhs exp) = do
 
 eval (Call expr msg args) = do
   val <- eval expr
-  r <- liftIO $ valToObj val
+  r <-  valToObj val
   vals <- mapM eval args
   case r of 
     Pid pid -> dispatchM pid (Execute (simple msg) vals)
@@ -120,9 +120,8 @@ eval (If pred cons alt) = do
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
   case cls of 
-    VError _ -> buildClass n super exp
     VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
- 			   
+    _ -> buildClass n super exp
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 
@@ -139,7 +138,7 @@ evalT (Apply var args) = do
   fn vals
 evalT (Call  expr msg args) = do
   val <- eval expr
-  r <- liftIO $ valToObj val
+  r <- valToObj val
   vals <- mapM eval args
   case r of 
     Pid pid -> tailM pid (Execute (simple msg) vals)

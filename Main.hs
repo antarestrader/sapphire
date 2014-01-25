@@ -20,7 +20,7 @@ main :: IO ()
 main = do
   main <- boot
   context <- newContextIO main responderObject
-  repl context
+  interperter ["base/base.sap"] context
  
 repl :: Context -> IO ()
 repl c = do
