@@ -273,7 +273,24 @@ termExpr = (setState False) >> (statement <|> term)
       when (not blk) tend
       return exp
 
-exprs = many1 termExpr
+tmeta = tokenP tok <?> "Comment/pragma"
+  where
+    tok Token{token=TMeta s} = Just s
+    tok _ = Nothing
+
+meta = do
+  tmeta  
+  (tend >> return ()) <|> (block >> return ())
+
+many1Ignore :: Stream s m t => ParsecT s u m a -> ParsecT s u m b -> ParsecT s u m [a]
+many1Ignore pa pb = do
+  many pb
+  many1 $ do
+    a <- pa
+    many pb
+    return a
+
+exprs = many1Ignore termExpr meta
 
 expr' = statement <|> expr1a
   where

@@ -21,13 +21,15 @@ $digit = 0-9
 $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
-@stringchar = \\\"|[^\"] -- " <- this is here to keep the text formattin intact
+@stringchar = \\\"|[^\"] -- " <- this is here to keep the text formatting intact
 @keywords = self|if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
 
 tokens :-
 
   $white+   ;
   @keywords                       {\(AlexPn _ _ i) s -> (i, TKeyword s)}
+  ^"#" .*                         {\(AlexPn _ _ i) s -> (i, TMeta s)}
+  "#" .*  ;
   ","                             {\(AlexPn _ _ i) s -> (i, TComma)}
   "::"                            {\(AlexPn _ _ i) s -> (i, TScope)}
   "="                             {\(AlexPn _ _ i) s -> (i, TAssign)}
@@ -75,6 +77,7 @@ data T =
   TOperator String |
   TString String   |
   TEnd             |
+  TMeta String     |  -- comments, pragma and friends
   TBlock CodeBlock
     deriving (Eq, Show)
 
