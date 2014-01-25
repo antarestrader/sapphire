@@ -1,3 +1,5 @@
+# base.sap Copyright 2014 John F. Miller
+
 class Number
   def add(y)
     @__value + y
@@ -10,3 +12,11 @@ class Number
 
   def call(y)
     @__value * y
+
+class Object
+  def nil?
+    false
+
+class NilClass
+  def nil?
+    true

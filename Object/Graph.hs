@@ -133,11 +133,14 @@ valToObj (VObject obj) = return obj
 valToObj val@(VInt _) = do
   cls <- getPrimClass "Number" 
   return $ buildPrimInstance cls val
+valToObj VNil = do
+  cls <- getPrimClass "NilClass"
+  return $ buildPrimInstance cls VNil
 valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
 
 getPrimClass :: String -> EvalM Object
 getPrimClass str = do
-  cls' <- (eval $ EVar $ simple "Number")
+  cls' <- (eval $ EVar $ simple str)
   case cls' of
     (VObject obj) -> return obj
     _ -> throwError $ "System Error: Primitive class not found: " ++ str
