@@ -39,6 +39,7 @@ import AST
 import Object
 import Object.Graph
 import Object.Spawn
+import String
 import Context
 import Var
 import Control.Monad
@@ -74,6 +75,8 @@ eval ENil = return VNil
 eval ETrue = return VTrue
 eval EFalse = return VFalse
 eval (EAtom a) = return (VAtom a)
+
+eval (EString s) = return $ VString $ mkStringLiteral s
 
 eval (EIVar s) = do
   val <- gets self >>= lookupIVarsM s 

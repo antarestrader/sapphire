@@ -52,6 +52,7 @@ bootstrapset = M.fromList [
        , ("-"   , VFunction F.sub  (2,Just 2))
        , ("*"   , VFunction F.mult (2,Just 2))
        , ("puts", VFunction F.puts (0,Nothing))
+       , ("to_s", VFunction F.to_s (0,Just 0)) 
        , ("cls" , VFunction F.cls  (0, Just 0))
        , ("setCVar" , VFunction F.setCVar  (2, Just 2))
        ]
@@ -59,4 +60,5 @@ bootstrapset = M.fromList [
 clsBootstrap = M.fromList [
          ("new"  , VFunction F.new   (0,Just 1))
        , ("spawn", VFunction F.spawn (0,Just 1))
+       , ("to_s" , VFunction F.to_s_Class (0, Just 0 ))
        ]

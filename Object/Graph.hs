@@ -61,6 +61,7 @@ lookupCVarsLocal _ (Pid _) = error "lookupCVarsLocal called with remote object"
 lookupCVarsLocal s obj = M.lookup s (cvars obj)
 
 lookupVar :: Var -> EvalM Value
+lookupVar Self = gets (VObject . self)
 lookupVar var = do
   context <- get
   let str = top var
@@ -136,6 +137,9 @@ valToObj val@(VInt _) = do
 valToObj VNil = do
   cls <- getPrimClass "NilClass"
   return $ buildPrimInstance cls VNil
+valToObj val@(VString _) = do
+  cls <- getPrimClass "String"
+  return $ buildPrimInstance cls val
 valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
 
 getPrimClass :: String -> EvalM Object

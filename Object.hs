@@ -2,11 +2,11 @@
 
 module Object where
 
-import qualified Data.Text as T
 import qualified Data.Map as M
 
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
+import String
 import Var
 import qualified Continuation as C
 import Data.Maybe
@@ -39,7 +39,7 @@ instance Eq Value where
 instance Show Value where
   show (VInt i) = show i
   show (VFloat f) = show f
-  show (VString st) = show $ text st
+  show (VString st) = show st
   show VNil = "nil"
   show VTrue = "true"
   show VFalse = "false"
@@ -59,8 +59,6 @@ checkArity :: Arity -> Int -> Bool
 checkArity (min, Just max) x | (min <= x) && (x <= max) = True
 checkArity (min, Nothing)  x | (min <= x) = True
 checkArity _ _ = False
-
-data SapString = SapString {encoding :: String, esscapes :: [String], text :: T.Text } deriving Eq --TODO FixMe
 
 type Precedence = (Int, AssocLR, AssocLR)
 

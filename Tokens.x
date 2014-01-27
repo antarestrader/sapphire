@@ -22,6 +22,7 @@ $alpha = [a-zA-Z]
 $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
 @stringchar = \\\"|[^\"] -- " <- this is here to keep the text formatting intact
+@stringchar2 = \\\'|[^\'] -- '
 @keywords = self|if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
 
 tokens :-
@@ -55,7 +56,8 @@ tokens :-
   $opSym+"="                      {\(AlexPn _ _ i) s -> (i, TAssignOp $ init s)}
   $opSym+                         {\(AlexPn _ _ i) s -> (i, TOperator s)}
   \.                              {\(AlexPn _ _ i) s -> (i, TDot)}
-  \"@stringchar*\"                {\(AlexPn _ _ i) s -> (i, TString s)}
+  \"@stringchar*\"                {\(AlexPn _ _ i) s -> (i, TString $ tail $ init s)} --TODO Parse string
+  \'@stringchar2*\'               {\(AlexPn _ _ i) s -> (i, TString $ tail $ init s)}
 {
 
 -- | The core Token types.

@@ -11,6 +11,9 @@ import qualified Data.Map as M
 import Object
 import qualified Object.Spawn as S
 import Eval
+import AST
+import Var
+import String
 import Context
 
 binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM ()
@@ -26,7 +29,11 @@ sub  = binop (-)
 mult = binop (*)
 
 puts :: [Value] -> EvalM ()
-puts vals = (liftIO $ mapM_ print vals) >> replyM_ VNil
+puts vals = do
+  vals' <- mapM (\v -> eval (Call (EValue v) "to_s" [])) vals
+  let strs = map (\(VString s) -> string s) vals'   
+  liftIO $ mapM_ putStrLn strs 
+  replyM_ VNil
 
 cls [] = gets (klass . self) >>= (replyM_ . VObject)
 
@@ -54,3 +61,11 @@ new [] = do
 spawn xs = do
   obj <- (extract $ new xs) >>= (liftIO . S.spawn)
   replyM_ $ VObject obj
+
+to_s [] = do
+  v <- eval (EIVar "__value")
+  replyM_ $ VString $ mkStringLiteral $ show v
+
+to_s_Class [] = do
+  (VObject Class{properName = s}) <- eval (EVar Self)
+  replyM_ $ VString $ mkStringLiteral $ s
