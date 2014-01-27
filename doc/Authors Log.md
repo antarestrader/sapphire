@@ -7,6 +7,15 @@ is interesting enough to warrant recording.  This is not a change log for a
 stable program release, but rather a record of thoughts and ideas recorded as
 Sapphire is constructed.
 
+This file is **not** covered under the code or documentation licences.  This
+file, Copyright &copy; 2013, 2014 by John F. Miller, is licenced under is licensed
+under a [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
+International License][licence].
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-nd/4.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-nd/4.0/88x31.png" /></a>
+
+[licence]: http://creativecommons.org/licenses/by-nc-nd/4.0/deed.en_US
+
 ## December 2, 2013 8:20am
 
 Last night I achieved the basics of function application.  This morning I am
@@ -49,7 +58,7 @@ It is now clearly time to work out the object model.  But before this can happen
 a little time needs to be spent on parsing blocks and the REPL.  Hopefully not
 too much.
 
-# December 4, 2013 at 10:02am
+## December 4, 2013 at 10:02am
 
 Yesterday I implemented the `If` statement. I want it to be intuitive,
 but also work with the LineParser model.  This has made it the most complex item
@@ -362,6 +371,91 @@ conditions here.  Another is to not pass a Future to another function (perhaps
 unless it knows it's coming.
 
 All thing to work out.  For now, I continue to work on pushing Continuation into
-the rest of the system.  Currently I'm working on Contex and Graph wish is good
+the rest of the system.  Currently I'm working on Contex and Graph which is good
 because that is where the deadlock that started this mess lived.
 
+## January 27, 2014 10:14am
+
+### Update on the last three weeks
+
+I have made much progress. Continuations now work as expected for the most part.
+I have split the continuation coded from the sapphire spesific stuff.  The later
+now lives in `Context.hs`.
+
+Much of what I have done in the last three weeks has been code clean up.  By the
+time I got continuations working the there was a lot of cruft left over, names
+were inconsistent, and things were in the wrong files.  I have made a little
+forward progress however.
+
+Most significantly, primitive values can now find their classes.  This was a
+necessary step before the next big project:
+
+### Strings
+
+While I envision LLVM compilation speeding up numerical calculations to
+acceptable levels for an interpreted language, much of what I see sapphire
+actually being used for is text manipulation.  To that end, I want a String
+implementation that is more sophisticated then just a list/array of bytes. For
+now I am content to use the Data.Text.Lazy package which works in a rope like
+manner. This allows O(1) concatenation and shared substructures which are
+important for a share nothing concurrency model.  What it does not do is allow
+for O(1) shared memory slices.  This may be a reason to move to ByteStrings.
+
+Today, I want to work through how to parse an interpreted string.  These
+strings are one of Ruby's best innovations. Double quoted strings can have all
+kinds of interpreted code in them.  For example the structure #{ ... } within a
+double quoted string will evaluate the code between the brackets and insert the
+result (perhaps with a `.to_s` call) into the string.  Like most languages, Ruby
+uses the convention of the backslash ( \ ) as an escape character.
+
+Implementing requires that I create some kind of structure that the evaluator
+can interpret.  One possibility is that the string parser just spits out AST
+code calling `concat` on the various chunks of text.  Another is to create a new
+type of AST node.  My intent is to create a separate scanner just for strings.
+
+### Lexing with Monads
+
+This also brings up another long standing issue.  The current Tokens.x lexer
+uses the `pson` wrapper in alex.  While this is a nice simple wrapper to get
+everything started, it is starting to show its limitations.  Most significantly,
+when it fails it simply dumps an error and crashes.  What is needed is to run
+the lexer in and Error Monad.  This then requires a different wrapper.
+
+The Monad and Monad User wrappers are a large jump in complexity. I have been
+doing a close re-reading of both the [Alex basic interface][alex-basic] and the
+[Alex monad wrapper][alex-wrapper] (code found [here][alex-code]). There is also
+a nice example of all the possible features found in in [language-lua][lua] on
+github.
+
+One gottcha with the Monadic Lexer is that is does not provide a complete
+scanner like the other.  The function `alexMonadScan` is retrieves only a single
+token. The logic for repeatedly applying the scanner until the end of the file is
+reached is left to the user.
+
+At this point I think the best action is to get my feet wet with the string
+lexer before moving on to the more complicated problem of the main lexer.
+
+### Array and Hash
+
+Even though strings do not depend on the underlying array implementation, the UI
+needed for the string class will need arrays and hashes will be needed soon as
+well.  The issue here is what to use as the underlying implementation.
+
+With arrays the expectation is O(1) access to the members.  Haskell's lists are
+O(n).  Haskell comes with an Array module.  However, I want to support both
+dynamic length and sparse arrays, while still maintaining good performance in
+the case of short fixed length arrays that are the common result of literal
+arrays.  I am inclined to use a hybrid approach with fixed length arrays being
+promoted to a more dynamic structure on first use.
+
+Hashes, seem easier because there need not be any performance guarantees like
+with arrays.  Obviously the desire is for the best performance possible with
+lookups certainly in the O(log n) range.  I think a simple map or slightly more
+complex HashMap would work. I will need to make Value a good instance of EQ and
+possibly an instance of Hashable as well.  This could be tricky sense I cannot
+use the IO monad.
+
+[alex-basic]: http://www.haskell.org/alex/doc/html/basic-api.html
+[alex-wrapper]: http://www.haskell.org/alex/doc/html/wrappers.html
+[alex-code]: https://github.com/simonmar/alex/blob/master/templates/wrappers.hs
+[lua]: https://github.com/osa1/language-lua/blob/master/src/Language/Lua/Lexer.x

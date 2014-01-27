@@ -10,3 +10,4 @@ dist/
 *.swo
 *.swp
 *~
+doc/*.html
