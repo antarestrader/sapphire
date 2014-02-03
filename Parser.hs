@@ -5,6 +5,7 @@ import LineParser (parseCode, filename)
 import AST
 import Var
 import Control.Monad
+import Control.Monad.Error.Class
 import Data.Maybe
 import Text.Parsec hiding (token, string)
 import qualified Text.Parsec as P
@@ -14,13 +15,21 @@ type TParser = Parsec [Token] Bool
 
 position t = newPos (tfile t) (fromIntegral $ tline t) (fromIntegral $ toffset t)
 
-parseString :: String -> Either ParseError [Exp]
-parseString s = runParser exprs False "Input String" $ scanBlock $ parseCode "Input String" s
+runParser' p s fp xs = case runParser p s fp xs of
+  Left err -> Left $ show err
+  Right es -> Right es
 
-parseFile :: FilePath -> IO (Either ParseError [Exp])
-parseFile f = do
+parseString :: String -> Either String [Exp]
+parseString s = do
+  tokens <- scanBlock $ parseCode "Input String" s
+  runParser' exprs False "Input String" tokens
+
+parseFile :: FilePath -> IO (Either String [Exp])
+parseFile f = do --IO Monad
   source <- readFile f
-  return $ runParser exprs False f $ scanBlock $ parseCode f source
+  return $ do -- Either Monad
+    tokens <- scanBlock $ parseCode f source
+    runParser' exprs False f tokens
 
 tokenP :: (Token -> Maybe a) -> TParser a
 tokenP = P.token show position
@@ -52,9 +61,11 @@ block  = do
   blk <- tokenP tok
   putState True
   let file = filename $ blk
-  let result = runParser exprs False file (scanBlock blk) 
+  let result = do 
+        tokens <- scanBlock blk
+        runParser' exprs False file tokens 
   case result of 
-    Left p -> parserError p
+    Left p -> parserFail p  -- check here for problems with large nested error messages
     Right exps ->  return $ Block exps
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
@@ -181,9 +192,11 @@ ifBlock = do
   blk <- tokenP tok
   putState True
   let file = filename blk
-  let result = runParser ifBlock' False file (scanBlock blk)
+  let result = do
+        tokens <- scanBlock blk
+        runParser' ifBlock' False file tokens
   case result of 
-    Left p  -> parserError p -- TODO Propagate error
+    Left p  -> parserFail p -- TODO Propagate error
     Right x -> return x
 
 ifBlock' :: TParser (Exp, Maybe Exp)

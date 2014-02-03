@@ -21,6 +21,7 @@ main = do
   main <- boot
   context <- newContextIO main responderObject
   interperter ["base/base.sap"] context
+  -- interperter [""] context
  
 repl :: Context -> IO ()
 repl c = do
@@ -43,7 +44,7 @@ parserREPL c = do
     _  -> do
            let result = parseString l
            case result of
-             Left  err -> putStrLn ("Error: " ++ show err) >> parserREPL c
+             Left  err -> putStrLn ("Error: " ++ err) >> parserREPL c
              Right exps -> do
                mapM_ print exps 
                parserREPL c

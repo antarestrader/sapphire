@@ -78,8 +78,9 @@ scanTokens fp l m = runLexer init loop
           Nothing -> maybeToList `fmap` makeToken TEnd
           Just bk -> return [Token (filename bk) (startLine bk) (indent bk) (TBlock bk)]
         AlexError t' -> throwError "Lexer Error" -- todo more info please
-        AlexSkip t' _ -> putInput t >> loop
+        AlexSkip t' _ -> putInput t' >> loop
         AlexToken t' i act -> do
+          putInput t'
           token <- act (matched t i)
           ts <- loop
           case token of
