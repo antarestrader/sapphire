@@ -49,13 +49,13 @@ alexGetByte (p,_,[],(c:s)) =
       (b:bs) = utf8Encode c
   in p' `seq` Just (b, (p',c,bs,s))
 
-skip :: Lexer (Maybe Token)
-skip = return Nothing
+skip :: Lexer [Token]
+skip = return []
 
-makeToken :: T -> Lexer (Maybe Token)
+makeToken :: T -> Lexer [Token]
 makeToken t = do
   s <- get
-  return $ Just $ Token{ tfile = lsFile s, tline = lsLine s, toffset = alexOffset(input s), token = t}
+  return [Token{ tfile = lsFile s, tline = lsLine s, toffset = alexOffset(input s), token = t}]
 
 buffer :: Lexer String
 buffer = do
@@ -86,6 +86,8 @@ data T =
   TOperator String |
   TString String   |
   TEnd             |
+  StartInterp      |
+  EndInterp        |
   TMeta String     |  -- comments, pragma and friends
   TBlock CodeBlock
     deriving (Eq, Show)

@@ -28,53 +28,59 @@ $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 
 tokens :-
 
- <0> $white+   ;
- <0> @keywords                       {\s -> makeToken $ TKeyword s}
+ <0, interp> $white+   ;
+ <0, interp> @keywords               {\s -> makeToken $ TKeyword s}
  <0> ^"#" .*                         {\s -> makeToken $ TMeta s}
- <0> "#" .*  ;
- <0> ","                             {\s -> makeToken $ TComma}
- <0> "::"                            {\s -> makeToken $ TScope}
- <0> "="                             {\s -> makeToken $ TAssign}
- <0> "=="                            {\s -> makeToken $ TOperator s}
- <0> "==="                           {\s -> makeToken $ TOperator s}
- <0> "->"                            {\s -> makeToken $ TSend}
- <0> "<-"                            {\s -> makeToken $ TSuper}
- <0> ^@ident\:$                      {\s -> makeToken $ TLabel s}
- <0> ^@ident\:[^\:]                  {\s -> makeToken $ TLabel s}
- <0> \:@ident\:$                     {\s -> makeToken $ TLabel $ tail s}
- <0> \@@ident                        {\s -> makeToken $ TIVar  $ tail s}
- <0> \:@ident\:/~\:                  {\s -> makeToken $ TLabel $ tail s}
- <0> \:@ident                        {\s -> makeToken $ TAtom  $ tail s}
- <0> $digit+\.$digit+([eE][\+\-]?$digit+)?  {\s -> makeToken $ TFloat (read s)}
- <0> $digit+                         {\s -> makeToken $ TInt (read s)}
- <0> @ident                          {\s -> makeToken $ TVar s}
- <0> \(                              {\s -> makeToken $ TOpen}
- <0> \)                              {\s -> makeToken $ TClose}
- <0> \[                              {\s -> makeToken $ TBracket}
- <0> \]                              {\s -> makeToken $ TBracketClose}
+ <0, interp> "#" .*  ;
+ <0, interp> ","                     {\s -> makeToken $ TComma}
+ <0, interp> "::"                    {\s -> makeToken $ TScope}
+ <0, interp> "="                     {\s -> makeToken $ TAssign}
+ <0, interp> "=="                    {\s -> makeToken $ TOperator s}
+ <0, interp> "==="                   {\s -> makeToken $ TOperator s}
+ <0, interp> "->"                    {\s -> makeToken $ TSend}
+ <0, interp> "<-"                    {\s -> makeToken $ TSuper}
+ <0, interp> ^@ident\:$              {\s -> makeToken $ TLabel s}
+ <0, interp> ^@ident\:[^\:]          {\s -> makeToken $ TLabel s}
+ <0, interp> \:@ident\:$             {\s -> makeToken $ TLabel $ tail s}
+ <0, interp> \@@ident                {\s -> makeToken $ TIVar  $ tail s}
+ <0, interp> \:@ident\:/~\:          {\s -> makeToken $ TLabel $ tail s}
+ <0, interp> \:@ident                {\s -> makeToken $ TAtom  $ tail s}
+ <0, interp> $digit+\.$digit+([eE][\+\-]?$digit+)?  {\s -> makeToken $ TFloat (read s)}
+ <0, interp> $digit+                 {\s -> makeToken $ TInt (read s)}
+ <0, interp> @ident                  {\s -> makeToken $ TVar s}
+ <0, interp> \(                      {\s -> makeToken $ TOpen}
+ <0, interp> \)                      {\s -> makeToken $ TClose}
+ <0, interp> \[                      {\s -> makeToken $ TBracket}
+ <0, interp> \]                      {\s -> makeToken $ TBracketClose}
  <0> \{                              {\s -> makeToken $ TBrace}
  <0> \}                              {\s -> makeToken $ TBraceClose}
- <0> $opSym+"="                      {\s -> makeToken $ TAssignOp $ init s}
- <0> $opSym+                         {\s -> makeToken $ TOperator s}
- <0> \.                              {\s -> makeToken $ TDot}
+ <0, inperp> $opSym+"="              {\s -> makeToken $ TAssignOp $ init s}
+ <0, interp> $opSym+                 {\s -> makeToken $ TOperator s}
+ <0, interp> \.                      {\s -> makeToken $ TDot}
  <0> \'                              {\_ -> setMode sqString >> skip}
  <sqString> [^ \\ \' \n]+            {\s -> appendBuffer s >> skip}
  <sqString> \\ \'                    {\_ -> appendBuffer "'" >> skip}
  <sqString> \\ \\                    {\_ -> appendBuffer "\\" >> skip}
  <sqString> \\                       {\_ -> appendBuffer "\\" >> skip}
- <sqString, dqString> \n           {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
- <sqString> \'                       {\_ -> setMode 0 >> buffer >>= (makeToken . TString)} -- TODO Clear Buffer
+ <sqString, dqString> \n             {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
+ <sqString> \'                       {\_ -> do { setMode 0; s <- buffer; clearBuffer; (makeToken $ TString s)}}
  <0> \"                              {\_ -> setMode dqString >> skip}
  <dqString> [^ \\ \" \n \#]+         {\s -> appendBuffer s >> skip }
- <dqString> \"                       {\_ -> setMode 0 >> buffer >>= (makeToken . TString)}
+ <dqString> \"                       {\_ -> do { setMode 0; s <- buffer; clearBuffer; (makeToken $ TString s)}}
  <dqString> \\ \"                    {\_ -> appendBuffer "\"" >> skip}
  <dqString> \\ [^ 0-9 x ]            {\s -> appendBuffer (esc $ tail s) >> skip} --TODO TLA escapes, \0, control codes
  <dqString> \\ [0-9]+                {\s -> appendBuffer ([chr $ read $ tail s]) >> skip}
  <dqString> \\ x [0-9 a-f A-F]+      {\s -> appendBuffer ([chr $ read $ ('0':(tail s))]) >> skip}
-
+ <dqString> "#{"                     {\_ -> do
+                                              setMode interp
+                                              a <-  ( buffer >>= (makeToken . TString))
+                                              clearBuffer
+                                              b <-  makeToken StartInterp
+                                              return (a ++ b) }
+ <interp>  \}                        {\_ -> setMode dqString >> makeToken EndInterp}
 {
 
--- action must be String -> Lexer (Maybe Token)
+-- action must be String -> Lexer [Token]
 
 scanTokens :: FilePath
            -> Line
@@ -89,17 +95,15 @@ scanTokens fp l m = runLexer init loop
       t <- gets input
       case (alexScan t m) of
         AlexEOF -> case block l of
-          Nothing -> maybeToList `fmap` makeToken TEnd
+          Nothing -> (makeToken TEnd)
           Just bk -> return [Token (filename bk) (startLine bk) (indent bk) (TBlock bk)]
         AlexError t' -> throwError "Lexer Error" -- todo more info please
         AlexSkip t' _ -> putInput t' >> loop
         AlexToken t' i act -> do
           putInput t'
-          token <- act (matched t i)
-          ts <- loop
-          case token of
-            Just t -> return (t:ts)
-            Nothing -> return ts
+          ts <- act (matched t i)
+          tss <- loop
+          return (ts ++ tss)
     
     matched :: AlexInput -> Int -> String
     matched (_,_,_,s) l = take l s
