@@ -13,6 +13,7 @@ data LexState = L
   , input :: AlexInput
   , lsLine :: LineNo
   , lsFile :: FilePath
+  , _buffer :: String -> String
   }
 
 type Lexer = ErrorT String (State LexState)
@@ -56,6 +57,16 @@ makeToken t = do
   s <- get
   return $ Just $ Token{ tfile = lsFile s, tline = lsLine s, toffset = alexOffset(input s), token = t}
 
+buffer :: Lexer String
+buffer = do
+  b <- gets _buffer
+  return $ b ""
+
+clearBuffer :: Lexer ()
+clearBuffer = modify (\s -> s{_buffer=id})
+
+appendBuffer str = modify (\s@L{_buffer=b} -> s{_buffer = b . (str ++)})
+
 -- | The core Token types.
 data T =
   TKeyword String  | 
@@ -84,6 +95,11 @@ data Token = Token {tfile:: FilePath, tline :: LineNo, toffset::Offset, token::T
 
 instance Show Token where
   show t = printf "[%s (%i,%i)]" (show $ token t) (tline t) (toffset t)
+
+esc :: String -> String
+esc "n" = "\n"
+esc "t" = "\t"
+esc c = c
 
 -- | Encode a Haskell String to a list of Word8 values, in UTF8 format.
 utf8Encode :: Char -> [Word8]

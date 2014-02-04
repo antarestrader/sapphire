@@ -12,6 +12,7 @@ import LineParser
 import Lexer
 import Prelude hiding (lines)
 import Data.Maybe
+import Data.Char
 import Control.Monad.Error.Class
 import Control.Monad.State.Class
 
@@ -56,8 +57,21 @@ tokens :-
  <0> $opSym+"="                      {\s -> makeToken $ TAssignOp $ init s}
  <0> $opSym+                         {\s -> makeToken $ TOperator s}
  <0> \.                              {\s -> makeToken $ TDot}
- <0> \"@stringchar*\"                {\s -> makeToken $ TString $ tail $ init s} --TODO Parse string
- <0> \'@stringchar2*\'               {\s -> makeToken $ TString $ tail $ init s}
+ <0> \'                              {\_ -> setMode sqString >> skip}
+ <sqString> [^ \\ \' \n]+            {\s -> appendBuffer s >> skip}
+ <sqString> \\ \'                    {\_ -> appendBuffer "'" >> skip}
+ <sqString> \\ \\                    {\_ -> appendBuffer "\\" >> skip}
+ <sqString> \\                       {\_ -> appendBuffer "\\" >> skip}
+ <sqString, dqString> \n           {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
+ <sqString> \'                       {\_ -> setMode 0 >> buffer >>= (makeToken . TString)} -- TODO Clear Buffer
+ <0> \"                              {\_ -> setMode dqString >> skip}
+ <dqString> [^ \\ \" \n \#]+         {\s -> appendBuffer s >> skip }
+ <dqString> \"                       {\_ -> setMode 0 >> buffer >>= (makeToken . TString)}
+ <dqString> \\ \"                    {\_ -> appendBuffer "\"" >> skip}
+ <dqString> \\ [^ 0-9 x ]            {\s -> appendBuffer (esc $ tail s) >> skip} --TODO TLA escapes, \0, control codes
+ <dqString> \\ [0-9]+                {\s -> appendBuffer ([chr $ read $ tail s]) >> skip}
+ <dqString> \\ x [0-9 a-f A-F]+      {\s -> appendBuffer ([chr $ read $ ('0':(tail s))]) >> skip}
+
 {
 
 -- action must be String -> Lexer (Maybe Token)
@@ -95,6 +109,7 @@ scanTokens fp l m = runLexer init loop
              , input = (offset l,'\n',[],line l)
              , lsLine = lineNo l
              , lsFile = fp
+             , _buffer = id
              }
 
 -- | create a token stream for a line including its associated block
