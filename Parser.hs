@@ -1,3 +1,20 @@
+-- Parser.hs Copyright 2013,2014 by John F. Miller
+
+-- | Sapphire parser using the Parsec monadic parser combinator library
+--
+-- The goal of the parser is to turn tokens from the lexer into expressions
+-- as shown in the AST. The parser is build out of a large and expanding
+-- number of sub parsers.  There are four rough categories: 1) elementry
+-- parsers that transalte straight from Token to Exp, 2) basic sequence
+-- parsers that grab a defined list of tokens and build a Exp from them, 3)
+-- mutation parsers that take simple expressions and use that tokens that
+-- follow them to possibally create more complex expressions, 4)
+-- combinatorial parsers that merge several smaller expressions into a
+-- single parser.
+
+-- In addation to the parsers there are some functions that facilitate
+-- parsing of lines, files and input strings
+   
 module Parser where
 
 import Tokens
@@ -11,19 +28,30 @@ import Text.Parsec hiding (token, string)
 import qualified Text.Parsec as P
 import Text.Parsec.Pos
 
+-- | Type synonym for the type of our parser
+--
+-- all our parsers take a stream of Tokens produced by the Lexer. The Bool
+-- is a user state and is used to track parsing of Blocks at the end of a
+-- line.
 type TParser = Parsec [Token] Bool
 
 position t = newPos (tfile t) (fromIntegral $ tline t) (fromIntegral $ toffset t)
 
+-- | wrapper around the Parsec runParser method that returns a string on
+--   errors to be compatible with the other error producing functions in
+--   Sapphire.  If someday errors become more then simple strings this is
+--   where ParseErrors need to be converted into Sapphire spesific errors.
 runParser' p s fp xs = case runParser p s fp xs of
   Left err -> Left $ show err
   Right es -> Right es
 
+-- | Used by the REPL to parse its input.
 parseString :: String -> Either String [Exp]
 parseString s = do
   tokens <- scanBlock $ parseCode "Input String" s
   runParser' exprs False "Input String" tokens
 
+-- | parse an entire file.
 parseFile :: FilePath -> IO (Either String [Exp])
 parseFile f = do --IO Monad
   source <- readFile f
@@ -31,9 +59,12 @@ parseFile f = do --IO Monad
     tokens <- scanBlock $ parseCode f source
     runParser' exprs False f tokens
 
+-- | Helper method parsing simple tokens
 tokenP :: (Token -> Maybe a) -> TParser a
 tokenP = P.token show position
 
+-- | Helper method for parsing basic tokens that do not produce expression
+--   on their own.
 tokenEq :: T -> TParser Token
 tokenEq t = tokenP (\t' -> if t == (token t') then Just t' else Nothing)
 
@@ -56,6 +87,7 @@ tsuper = tokenEq TSuper         <?> "<-"
 tstartI = tokenEq StartInterp
 tendI   = tokenEq EndInterp
 
+-- | parse a code block if it is the next token.
 block :: TParser Exp
 block  = do
   let tok Token {token = (TBlock b)} = Just b
@@ -85,6 +117,7 @@ prepend x xs = do
   rs <- option [] xs
   return (r:rs)
 
+-- | Match a keyword Token.  Note the return value is almost never used.
 keyword :: String -> TParser String
 keyword s = tokenP testTok <?> s
   where
@@ -109,9 +142,11 @@ string = tokenP tok <?> "String literal"
     tok Token {token=TString s} = Just $ EString s
     tok _ = Nothing
 
+-- | A piece of sapphire code embedded in an extended string.
 interp :: TParser Exp
 interp  = between tstartI tendI expr
 
+-- | An extended string consisting of TStrings and interp blocks
 exString :: TParser Exp
 exString = do 
     x <- string
@@ -136,8 +171,11 @@ paren = between open close expr
 argumentList :: TParser [Exp]
 argumentList = between open close $ sepBy expr comma
 
+paramList :: TParser [String]
 paramList = between open close $ sepBy identifier comma
 
+-- | An identifier without scope. It forms the bases for a number of named
+--   things. (classes, defs, vars, function application, method calles, etc)
 identifier :: TParser String
 identifier = tokenP tok
   where
@@ -156,23 +194,44 @@ var = do
     let global = pscope [""]
     selfP <|> local <|> global <?> "variable expression"
 
+-- | Tries to turn a Var into function application.  Returns the and
+--   expression for the Var when there is no paramenter.  Look here to parse
+--   paren-less function application (TODO)
 args var =
   (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
 
-op :: TParser (Op,Exp)
-op = do
-    o <-  tokenP testTok <?> "operator symbol"
-    e <- expr'
-    return(o,e)
-  where
-    testTok Token{ token=(TOperator op)} = Just op
-    testTok _ = Nothing
 
+-- | a sequence of expressions seperated by operators
 opStr :: Exp -> TParser Exp
 opStr e0 = do
     ops <- many1 op
     return $ OpStr e0 ops
 
+-- | An operator and the expression which follows it.
+op :: TParser (Op,Exp)
+op = do
+    o <-  tokenP testTok <?> "operator symbol"
+    e <- expr'  -- extended expression sans opStr
+    return(o,e)
+  where
+    testTok Token{ token=(TOperator op)} = Just op
+    testTok _ = Nothing
+
+-- | An extended expression without the opStr option used within OpStr 
+expr' = statement <|> expr1a
+  where
+    expr1a = expr0 >>= extend
+    extend exp = (extension' exp >>= extend) <|> return exp
+    extension' exp = assign exp <|> indexed exp <|> called exp <|> sent exp
+
+-- | An extension parser for assignment expressions
+--   
+--   Assignment is a little tricky because only certian forms can be
+--   assigned to.  There is no possible way to assign to a literal value.
+--   To accomplish this after finding an assignment operator, the parser
+--   uses a helper function (@transLHS@) to convert the LHS expression into
+--   a special data type.  If that is not possible the transLHS parser
+--   fails.
 assign :: Exp -> TParser Exp
 assign lhs' = do
   assignP
@@ -296,7 +355,7 @@ termExpr = (setState False) >> (statement <|> term)
       blk <- getState
       when (not blk) tend
       return exp
-
+-- | comments WIP
 tmeta = tokenP tok <?> "Comment/pragma"
   where
     tok Token{token=TMeta s} = Just s
@@ -306,6 +365,7 @@ meta = do
   tmeta  
   (tend >> return ()) <|> (block >> return ())
 
+-- | Used to ignore comments.
 many1Ignore :: Stream s m t => ParsecT s u m a -> ParsecT s u m b -> ParsecT s u m [a]
 many1Ignore pa pb = do
   many pb
@@ -316,8 +376,4 @@ many1Ignore pa pb = do
 
 exprs = many1Ignore termExpr meta
 
-expr' = statement <|> expr1a
-  where
-    expr1a = expr0 >>= extend
-    extend exp = (extension' exp >>= extend) <|> return exp
-    extension' exp = assign exp <|> indexed exp <|> called exp <|> sent exp
+
