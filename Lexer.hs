@@ -9,7 +9,7 @@ import Data.Char
 import Data.Word
 
 data LexState = L
-  { mode::Int
+  { mode::[Int]
   , input :: AlexInput
   , lsLine :: LineNo
   , lsFile :: FilePath
@@ -24,8 +24,14 @@ runLexer s m = evalState (runErrorT m) s
 putInput :: AlexInput -> Lexer ()
 putInput t = modify (\s -> s{input = t})
 
-setMode :: Int -> Lexer ()
-setMode m = modify (\s -> s{mode = m})
+pushMode :: Int -> Lexer ()
+pushMode m = modify (\s@L{mode=ms} -> s{mode = (m:ms)})
+
+popMode :: Lexer ()
+popMode = modify pop
+  where
+    pop s@L{mode=([_])}  = s{mode = [0]}
+    pop s@L{mode=(m:ms)} = s{mode = (ms)}
 
 type AlexInput = ( Offset
                  , Char

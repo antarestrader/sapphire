@@ -115,7 +115,7 @@ system c = do
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of
-   Left p  -> throwError $ show p
+   Left p  -> throwError $ p
    Right es -> fmap last $ mapM eval es
 
 prompt :: String -> IO String

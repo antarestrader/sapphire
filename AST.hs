@@ -13,6 +13,7 @@ data Exp =
   | EValue Value -- ^ allows values to be "shoved" values back into expressions
   | EFloat Double -- ^ real number literal
   | EString String -- ^ string literal
+  | ExString [Exp] -- ^ concat all elements together as a string
   | EAtom String -- ^ atom literal (:foo)
   | EIVar String -- ^ Named istance variable (\@foo)
   | ENil | EFalse | ETrue

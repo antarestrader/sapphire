@@ -1,4 +1,5 @@
 {
+-- Tokens.x Copyright 2013, 2014 John F. Miller
 module Tokens (
     Token(..)
   , T(..)
@@ -31,7 +32,8 @@ tokens :-
  <0, interp> $white+   ;
  <0, interp> @keywords               {\s -> makeToken $ TKeyword s}
  <0> ^"#" .*                         {\s -> makeToken $ TMeta s}
- <0, interp> "#" .*  ;
+ <0> "#" .*  ;
+ <interp> "#" [^ \} ]*  ;
  <0, interp> ","                     {\s -> makeToken $ TComma}
  <0, interp> "::"                    {\s -> makeToken $ TScope}
  <0, interp> "="                     {\s -> makeToken $ TAssign}
@@ -57,27 +59,27 @@ tokens :-
  <0, inperp> $opSym+"="              {\s -> makeToken $ TAssignOp $ init s}
  <0, interp> $opSym+                 {\s -> makeToken $ TOperator s}
  <0, interp> \.                      {\s -> makeToken $ TDot}
- <0> \'                              {\_ -> setMode sqString >> skip}
+ <0, interp> \'                      {\_ -> pushMode sqString >> skip}
  <sqString> [^ \\ \' \n]+            {\s -> appendBuffer s >> skip}
  <sqString> \\ \'                    {\_ -> appendBuffer "'" >> skip}
  <sqString> \\ \\                    {\_ -> appendBuffer "\\" >> skip}
  <sqString> \\                       {\_ -> appendBuffer "\\" >> skip}
  <sqString, dqString> \n             {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
- <sqString> \'                       {\_ -> do { setMode 0; s <- buffer; clearBuffer; (makeToken $ TString s)}}
- <0> \"                              {\_ -> setMode dqString >> skip}
+ <sqString> \'                       {\_ -> do { popMode; s <- buffer; clearBuffer; (makeToken $ TString s)}}
+ <0,interp> \"                              {\_ -> pushMode dqString >> skip}
  <dqString> [^ \\ \" \n \#]+         {\s -> appendBuffer s >> skip }
- <dqString> \"                       {\_ -> do { setMode 0; s <- buffer; clearBuffer; (makeToken $ TString s)}}
+ <dqString> \"                       {\_ -> do { popMode; s <- buffer; clearBuffer; (makeToken $ TString s)}}
  <dqString> \\ \"                    {\_ -> appendBuffer "\"" >> skip}
  <dqString> \\ [^ 0-9 x ]            {\s -> appendBuffer (esc $ tail s) >> skip} --TODO TLA escapes, \0, control codes
  <dqString> \\ [0-9]+                {\s -> appendBuffer ([chr $ read $ tail s]) >> skip}
  <dqString> \\ x [0-9 a-f A-F]+      {\s -> appendBuffer ([chr $ read $ ('0':(tail s))]) >> skip}
  <dqString> "#{"                     {\_ -> do
-                                              setMode interp
+                                              pushMode interp
                                               a <-  ( buffer >>= (makeToken . TString))
                                               clearBuffer
                                               b <-  makeToken StartInterp
                                               return (a ++ b) }
- <interp>  \}                        {\_ -> setMode dqString >> makeToken EndInterp}
+ <interp>  \}                        {\_ -> popMode >> makeToken EndInterp}
 {
 
 -- action must be String -> Lexer [Token]
@@ -91,7 +93,7 @@ scanTokens fp l m = runLexer init loop
   where
     loop :: Lexer [Token]
     loop = do
-      m <- gets mode
+      m <- gets (head . mode)
       t <- gets input
       case (alexScan t m) of
         AlexEOF -> case block l of
@@ -109,7 +111,7 @@ scanTokens fp l m = runLexer init loop
     matched (_,_,_,s) l = take l s
 
     init :: LexState
-    init = L { mode = m
+    init = L { mode = [m]
              , input = (offset l,'\n',[],line l)
              , lsLine = lineNo l
              , lsFile = fp

@@ -53,6 +53,8 @@ trueP  = keyword "true"  >> return ETrue
 selfP  = keyword "self"  >> return Self <?> "self"
 tend   = tokenEq TEnd >> return () <?> "End of Line"
 tsuper = tokenEq TSuper         <?> "<-"
+tstartI = tokenEq StartInterp
+tendI   = tokenEq EndInterp
 
 block :: TParser Exp
 block  = do
@@ -106,6 +108,15 @@ string = tokenP tok <?> "String literal"
   where
     tok Token {token=TString s} = Just $ EString s
     tok _ = Nothing
+
+interp :: TParser Exp
+interp  = between tstartI tendI expr
+
+exString :: TParser Exp
+exString = do 
+    x <- string
+    xs <- many (interp <|> string)
+    if (null xs) then return x else return $ ExString (x:xs)
 
 ivar :: TParser Exp
 ivar = tokenP tok <?> "instance variable"
@@ -261,7 +272,7 @@ expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP <|> trueP 
      <|> (var >>= args) <|> ivar  <|> atom   <|> float 
-     <|> int <|> string <?> "basic expression unit"
+     <|> int <|> exString <?> "basic expression unit"
 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
