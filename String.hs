@@ -9,6 +9,7 @@ module String
   ) where
 
 import qualified Data.Text.Lazy as T
+import Data.Monoid
 
 data SapString = 
    SapString 
@@ -27,3 +28,10 @@ mkStringLiteral s = SapString { escapes = [], text = T.pack s }
 
 string :: SapString -> String
 string = T.unpack . text
+
+instance Monoid SapString where
+  mempty = SapString{escapes = [], text = T.empty}
+
+  mappend SapString{escapes=e1, text=x} SapString{escapes=e2, text=y} 
+    | (e1 == e2) = SapString{escapes = e1, text=mappend x y}
+    | otherwise  = error "Concatenating Strings with different escapes!"  -- TODO fixme

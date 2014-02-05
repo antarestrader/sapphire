@@ -35,6 +35,7 @@ where
 
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Monoid
 import AST
 import Object
 import Object.Graph
@@ -125,6 +126,22 @@ eval (EClass n super exp) = do
   case cls of 
     VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
     _ -> buildClass n super exp
+
+eval (ExString xs) = do
+    vals <- mapM eval xs
+    concatenate [] vals
+  where
+    concatenate :: [SapString] -> [Value] -> EvalM Value
+    concatenate ss [] = return $ VString $ mconcat (reverse ss)
+    concatenate ss (v:vs) = do { s<-vToStr v ; concatenate (s:ss) vs }
+
+    vToStr :: Value -> EvalM SapString
+    vToStr (VString s) = return s
+    vToStr val = do
+      v' <- eval (Call (EValue val) "to_s" [])
+      vToStr v'
+
+
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
 
