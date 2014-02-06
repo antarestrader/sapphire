@@ -7,18 +7,78 @@
 -- number of sub parsers.  There are four rough categories: 1) elementry
 -- parsers that transalte straight from Token to Exp, 2) basic sequence
 -- parsers that grab a defined list of tokens and build a Exp from them, 3)
--- mutation parsers that take simple expressions and use that tokens that
+-- extending parsers that take simple expressions and use that tokens that
 -- follow them to possibally create more complex expressions, 4)
--- combinatorial parsers that merge several smaller expressions into a
--- single parser.
+-- Unifying parsers that merge several smaller expressions into a
+-- single parser that well parse any of them.
 
 -- In addation to the parsers there are some functions that facilitate
 -- parsing of lines, files and input strings
    
-module Parser where
+module Parser (
+    -- * Invoking a Parser
+
+    -- | These function apply the complete parser different types of input
+    runParser'
+  , parseString
+  , parseFile
+    -- * Elementry 
+
+    -- | Parsers that identify control tokens, that is tokens without
+    --   content.
+  , comma, open, close, bopen, bclose, copen, cclose
+  , tdot, tsend, assignP, tsuper, tend, tstartI, tendI
+  , tmeta -- as currently implimented
+
+    -- * basic parsers
+
+    -- | These parsers return an expression translated from a single token.
+  , nil, falseP, trueP, selfP
+  , int, float,  ivar, atom
+    -- ** Strings
+  , string, exString
+    -- ** Scoped Variable Varsers
+  , identifier, var
+
+    -- * Grouping parsers
+
+    -- | These parsers form tree like structures
+  , paren, interp
+
+    -- ** Parameter and Argument lists
+  , paramList, argumentList
+
+    -- * Extending parsers
+
+    -- | These parser take a previous expression and create a more complex
+    --   expression out ot the subsiquent tokens.  The root expression is passes
+    --   into the parser to be used in creating the AST node.
+    --
+    --   All parsers in this section have the type @Exp -> TParser Exp@
+  , args, indexed, called, sent
+    -- ** Operator Strings
+  , opStr, op, exprForOpStr
+    -- ** Assignment
+  , assign, transLHS
+    -- ** Extended Parser Union
+  , extension
+
+    -- * Syntax Level Parsers
+  , lambda, ifParser, classParser, defParser
+  , meta
+    -- * Unifying Parsers
+
+    -- | These parsers use @<|>@ to bring together parsers at a related
+    --   level inorder to build up the complete saphire parser
+  , expr0, expr1, statement, expr, termExpr, exprs
+
+    -- * Combinators and utilities
+
+  , TParser, tokenP, tokenEq, keyword, position, many1Ignore, foldP, andor, prepend
+)where
 
 import Tokens
-import LineParser (parseCode, filename)
+import LineParser (parseCode, filename, CodeBlock)
 import AST
 import Var
 import Control.Monad
@@ -87,13 +147,11 @@ tsuper = tokenEq TSuper         <?> "<-"
 tstartI = tokenEq StartInterp
 tendI   = tokenEq EndInterp
 
--- | parse a code block if it is the next token.
+-- | If the next token is a block, treat it as Sapphire code and parse it
+--   returning a 'Block' expression.
 block :: TParser Exp
 block  = do
-  let tok Token {token = (TBlock b)} = Just b
-      tok _ = Nothing
-  blk <- tokenP tok
-  putState True
+  blk <- tblock
   let file = filename $ blk
   let result = do 
         tokens <- scanBlock blk
@@ -101,6 +159,14 @@ block  = do
   case result of 
     Left p -> parserFail p  -- check here for problems with large nested error messages
     Right exps ->  return $ Block exps
+
+-- | Extract a block from the end of the line but leave it unevaluated as it
+--   may not contain sapphire code (a comment for example)
+tblock :: TParser CodeBlock
+tblock = do {b <- tokenP tok; putState True; return b} -- True in state inhibits searching for TEnd
+  where
+    tok Token {token = (TBlock b)} = Just b
+    tok _ = Nothing
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
 foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)   
@@ -165,12 +231,15 @@ atom = tokenP tok
     tok Token {token=TAtom s} = Just $ EAtom s
     tok _ = Nothing
 
+-- | An expression between parentheses
 paren :: TParser Exp
 paren = between open close expr
 
+-- | The list of actual arguments (expression) in a function call
 argumentList :: TParser [Exp]
 argumentList = between open close $ sepBy expr comma
 
+-- | The list of formal parameters in a method/function defination
 paramList :: TParser [String]
 paramList = between open close $ sepBy identifier comma
 
@@ -182,6 +251,10 @@ identifier = tokenP tok
     tok Token {token=TVar v} = Just v
     tok _ = Nothing
 
+-- | An undecorated variable (@foo@) possibally scopped (@Foo::bar@)
+--   
+--   __Notice__: This parser does not stand on it own but relies on the special
+--   extending 'args' to produce an expression.
 var :: TParser Var
 var = do 
     let pscope xs = do
@@ -197,6 +270,10 @@ var = do
 -- | Tries to turn a Var into function application.  Returns the and
 --   expression for the Var when there is no paramenter.  Look here to parse
 --   paren-less function application (TODO)
+--
+--   __Notice__: Unlike all other extending parsers, 'args' cannot fail.  It is
+--   included in the set of basic parsers.
+args :: Var -> TParser Exp
 args var =
   (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
 
@@ -211,14 +288,14 @@ opStr e0 = do
 op :: TParser (Op,Exp)
 op = do
     o <-  tokenP testTok <?> "operator symbol"
-    e <- expr'  -- extended expression sans opStr
+    e <- exprForOpStr  -- extended expression sans opStr
     return(o,e)
   where
     testTok Token{ token=(TOperator op)} = Just op
     testTok _ = Nothing
 
 -- | An extended expression without the opStr option used within OpStr 
-expr' = statement <|> expr1a
+exprForOpStr = statement <|> expr1a
   where
     expr1a = expr0 >>= extend
     extend exp = (extension' exp >>= extend) <|> return exp
@@ -229,7 +306,7 @@ expr' = statement <|> expr1a
 --   Assignment is a little tricky because only certian forms can be
 --   assigned to.  There is no possible way to assign to a literal value.
 --   To accomplish this after finding an assignment operator, the parser
---   uses a helper function (@transLHS@) to convert the LHS expression into
+--   uses a helper function ('transLHS') to convert the LHS expression into
 --   a special data type.  If that is not possible the transLHS parser
 --   fails.
 assign :: Exp -> TParser Exp
@@ -310,32 +387,41 @@ lambda = do
   params <- option [] paramList
   exp <- block <|> single
   return $ Lambda params exp
-  
+
+-- | An extension parser checking for indexing brackets @foo[1]@
 indexed exp = do
   idx <- between bopen bclose expr <?> "index expression ([...])"
   return $ Index exp idx
 
+-- | An extension paser loking for method calls of the form @foo.bar@
 called exp = do
   tdot
   s <- identifier
   args <- option [] argumentList
   return $ Call exp s args
 
+-- | An extension paser loking for asyncronous method calls of the form
+--   @foo->bar@
 sent exp = do
   tsend
   s <- identifier
   args <- option [] argumentList
   return $ Send exp s args
 
+-- | The union of all basic expressions
 expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP <|> trueP 
      <|> (var >>= args) <|> ivar  <|> atom   <|> float 
      <|> int <|> exString <?> "basic expression unit"
 
+-- | The union of all extending parsers.  Given a base expression this
+--   parser will check the subsiquent token stream for extended forms such
+--   as assignment, indexing, method calls or operator strings. 
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
 
+-- | Basic expressions with extensions applied
 expr1 :: TParser Exp
 expr1 = do
     exp <- expr0
@@ -343,11 +429,15 @@ expr1 = do
   where
     extend exp = (extension exp >>= extend) <|> return exp
 
-
+-- | forms not subject to extending parsers. These parsers include their own
+--   intrensic check for line termination.
 statement = lambda <|> ifParser <|> defParser <|> classParser
 
+-- | All possible forms of a single expression
 expr = statement <|> expr1
 
+-- | An expression where non-statement level expressions must have a TEnd of
+--   TBlock.
 termExpr = (setState False) >> (statement <|> term)
   where
     term = do
@@ -355,15 +445,17 @@ termExpr = (setState False) >> (statement <|> term)
       blk <- getState
       when (not blk) tend
       return exp
+
 -- | comments WIP
 tmeta = tokenP tok <?> "Comment/pragma"
   where
     tok Token{token=TMeta s} = Just s
     tok _ = Nothing
 
+-- | A complete line of comment, potentially including a comment block.
 meta = do
   tmeta  
-  (tend >> return ()) <|> (block >> return ())
+  (tend >> return ()) <|> (tblock >> return ())
 
 -- | Used to ignore comments.
 many1Ignore :: Stream s m t => ParsecT s u m a -> ParsecT s u m b -> ParsecT s u m [a]
@@ -374,6 +466,7 @@ many1Ignore pa pb = do
     many pb
     return a
 
+-- | A list of expressions with meta lines ignored
 exprs = many1Ignore termExpr meta
 
 
