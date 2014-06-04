@@ -41,6 +41,7 @@ import Object
 import Object.Graph
 import Object.Spawn
 import String
+import Array hiding (length, map)
 import Context
 import Var
 import Control.Monad
@@ -141,6 +142,9 @@ eval (ExString xs) = do
       v' <- eval (Call (EValue val) "to_s" [])
       vToStr v'
 
+eval (EArray xs) = do 
+  x's <-  mapM eval xs
+  return $ VArray $ fromList x's
 
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 

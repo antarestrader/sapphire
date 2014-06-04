@@ -52,6 +52,7 @@ instance Show Value where
   show VTrue = "true"
   show VFalse = "false"
   show (VAtom a) = ':':a
+  show (VArray a) = show a
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"

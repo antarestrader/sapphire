@@ -243,6 +243,11 @@ argumentList = between open close $ sepBy expr comma
 paramList :: TParser [String]
 paramList = between open close $ sepBy identifier comma
 
+arrayLiteral :: TParser Exp
+arrayLiteral = do 
+  xs <- between bopen bclose $ sepBy expr comma
+  return $ EArray xs
+
 -- | An identifier without scope. It forms the bases for a number of named
 --   things. (classes, defs, vars, function application, method calles, etc)
 identifier :: TParser String
@@ -413,7 +418,7 @@ expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP <|> trueP 
      <|> (var >>= args) <|> ivar  <|> atom   <|> float 
-     <|> int <|> exString <?> "basic expression unit"
+     <|> int <|> exString <|> arrayLiteral <?> "basic expression unit"
 
 -- | The union of all extending parsers.  Given a base expression this
 --   parser will check the subsiquent token stream for extended forms such
@@ -436,7 +441,7 @@ statement = lambda <|> ifParser <|> defParser <|> classParser
 -- | All possible forms of a single expression
 expr = statement <|> expr1
 
--- | An expression where non-statement level expressions must have a TEnd of
+-- | An expression where non-statement level expressions must have a TEnd or
 --   TBlock.
 termExpr = (setState False) >> (statement <|> term)
   where
