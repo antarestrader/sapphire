@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
 import String
+import Array
 import Var
 import qualified Continuation as C
 import Data.Maybe
@@ -20,11 +21,18 @@ data Value =
     VInt Integer
   | VFloat Double
   | VString SapString
+  | VArray Array
   | VNil | VFalse | VTrue
   | VAtom String
   | VFunction Fn Arity
-  | VObject Object -- may want to make this stric in Object
-  | VError Err
+  | VObject Object -- may want to make this strict in Object
+  | VError String
+
+vnil :: Value
+vnil = VNil
+
+verror :: String -> Value
+verror = VError
 
 instance Eq Value where
   (VInt i) == (VInt j) = i == j
