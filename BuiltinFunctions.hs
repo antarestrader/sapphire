@@ -15,6 +15,12 @@ import AST
 import Var
 import String
 import Context
+import Array.BuiltinFunctions (arrayClass)
+
+initialize :: [Value] -> EvalM ()
+initialize _ = do
+  arrayClass
+  replyM_ VNil
 
 binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM ()
 binop op [VFloat a, VFloat b] = replyM_ $ VFloat (a `op` b)

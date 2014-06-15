@@ -106,6 +106,13 @@ eval (Call expr msg args) = do
       extract $ method vals -- proper tail calls here
     -- TODO put self back (see issue #28 on github)
 
+eval (Index expr arg) = do
+  val <- eval expr
+  idx <- eval arg
+  case (val,idx) of
+    (VArray a, VInt i) -> return $ a ! fromInteger i
+    (v,i) -> eval (Call (EValue v) "[]" [EValue i])
+
 eval (Apply var args) = do
   (fn, arity) <- fnFromVar var
   guard $ checkArity arity $ length args

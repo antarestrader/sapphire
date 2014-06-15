@@ -140,6 +140,9 @@ valToObj VNil = do
 valToObj val@(VString _) = do
   cls <- getPrimClass "String"
   return $ buildPrimInstance cls val
+valToObj val@(VArray _) = do
+  cls <- getPrimClass "Array"
+  return $ buildPrimInstance cls val
 valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
 
 getPrimClass :: String -> EvalM Object

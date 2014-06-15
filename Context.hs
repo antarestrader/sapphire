@@ -47,7 +47,7 @@ import Continuation hiding (Responder, Message, Continuation, Replier)
 --   to enforce a clean interface, only the self field is exposed.
 data Context = Context 
                { locals :: M.Map String Value
-               , self :: Object
+               , self :: Object  -- ^ The object itself
                , continuation :: Continuation
                , responder :: Responder
                }
@@ -172,5 +172,3 @@ insertLocals s val c@Context {locals=l} =
 merge :: [(String,Value)] -> Context -> Context
 merge params  c@Context {locals=l} = 
   c{locals = M.union (M.fromList params) l} 
-
-

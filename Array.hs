@@ -61,7 +61,7 @@ slice :: Array -> (Int, Int) -> Array
 slice = undefined
 
 length :: Array -> Int
-length = undefined
+length a = extent a  -- ???
 
 each :: (Monad m) => Array -> (Value -> m ()) -> m ()
 each = undefined

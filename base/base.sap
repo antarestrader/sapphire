@@ -1,5 +1,7 @@
 # base.sap Copyright 2014 John F. Miller
 
+__initialize()
+
 class Number
   def add(y)
     @__value + y
