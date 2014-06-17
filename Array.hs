@@ -7,6 +7,7 @@ import Data.Maybe
 import Data.Word
 import Data.List
 import Prelude hiding (map, length)
+import Control.Monad
 import qualified Prelude as P
 import qualified Data.IntMap as M
 import qualified Data.Array.IArray as A
@@ -56,6 +57,8 @@ fromList xs = Array
   where
     l = max 20 (P.length xs) -- always allocate at least 20 elemets in an array
 
+toList :: Array -> [Value]
+toList = undefined
 
 slice :: Array -> (Int, Int) -> Array
 slice = undefined
@@ -63,11 +66,8 @@ slice = undefined
 length :: Array -> Int
 length a = extent a  -- ???
 
-each :: (Monad m) => Array -> (Value -> m ()) -> m ()
-each = undefined
-
-map :: (Monad m) => Array -> (Value -> m Value) -> m Array
-map = undefined
+inject :: (Monad m) => Array -> Value -> (Value -> Value -> m (Value)) -> m (Value)
+inject arr v0 fn = foldM fn v0 (toList arr) 
 
 instance Show Array where
   show a = '[':intercalate ", " (P.map show (take (extent a) (A.elems (base a)))) ++ "]"

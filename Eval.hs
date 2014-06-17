@@ -41,7 +41,7 @@ import Object
 import Object.Graph
 import Object.Spawn
 import String
-import Array hiding (length, map)
+import Array hiding (length)
 import Context
 import Var
 import Control.Monad

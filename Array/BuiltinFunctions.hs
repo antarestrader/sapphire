@@ -27,6 +27,7 @@ innerValue = do
 
 bootstrap = M.fromList [
          ("length", VFunction length (0,Just 0))
+       , ("__index", VFunction index (1,Just 1))
        ]
 -- | build the Array class with internal functions installed
 arrayClass :: EvalM Object
@@ -52,4 +53,16 @@ length :: [Value] -> EvalM ()
 length [] = do
   (VArray arr) <- innerValue -- TODO: deal with match failure
   replyM_ $ VInt $ fromIntegral $ A.length arr
+
+index [VInt i] = do
+  (VArray arr) <- innerValue
+  replyM_ $ arr A.! fromInteger i
+index _ = error "Index must take an integer, Call '[]' instead."
+
+inject [init, fn] = do
+  (VArray arr) <- innerValue
+  replyM_ =<< A.inject arr init fn'
+    where
+      fn' accum val = undefined -- Call fn with [accum,val] and return result; May have to alter Apply in AST
+
 
