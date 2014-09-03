@@ -31,6 +31,7 @@ data Exp =
   | Define LHS [String] Exp -- ^ a named function declairation
   | Def String [String] Exp -- ^ a method declairartion
   | Apply Var [Exp] -- ^ application of the actual params [Exp] to the function found at var
+  | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
   | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
   | Send Exp String [Exp] -- ^ concurrent method invocation (foo->bar(x))
   | Assign LHS Exp -- ^ assignment of a var (see LHS) 

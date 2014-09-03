@@ -7,8 +7,10 @@ import qualified Data.Map as M
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
 import String
-import Array
+import Array (Array)
+import qualified Array as A
 import Var
+import Data.Foldable (toList)
 import qualified Continuation as C
 import Data.Maybe
 
@@ -52,7 +54,7 @@ instance Show Value where
   show VTrue = "true"
   show VFalse = "false"
   show (VAtom a) = ':':a
-  show (VArray a) = show a
+  show (VArray a) = show $ toList a
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
