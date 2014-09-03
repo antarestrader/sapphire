@@ -26,3 +26,11 @@ class NilClass
 class String
   def to_s
     @__value
+
+class Array
+  def each(fn)
+    inject(nil) do |acc,val|
+      fn val
+
+  def push!(v)
+    @__value = push v 

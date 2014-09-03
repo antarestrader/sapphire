@@ -6,6 +6,7 @@ module Array.BuiltinFunctions where
 
 import Prelude hiding (length)
 import qualified Array as A
+import Array (Array,(|>),(><),(<|))
 import qualified Data.Map as M
 import Object
 import Object.Graph (lookupIVarsM)
@@ -27,9 +28,10 @@ innerValue = do
     Nothing -> return $ VError "Internal Value at @__value was not found in self"
 
 bootstrap = M.fromList [
-         ("length",  VFunction length (0,Just 0))
+         ("length" , VFunction length (0,Just 0))
        , ("__index", VFunction index (1,Just 1))
-       , ("inject",  VFunction inject (2,Just 2))
+       , ("inject" , VFunction inject (2,Just 2))
+       , ("push"   , VFunction push (0,Nothing))
        ]
 
 -- | build the Array class with internal functions installed
@@ -71,4 +73,11 @@ inject [init, fn] = do
     where
       fn' accum val = eval (ApplyFn (EValue fn) [(EValue accum),(EValue val)])
 
+push [] = replyM_ =<< innerValue
+push [val] = do
+  (VArray arr) <- innerValue
+  replyM_ $ VArray (arr |> val)
+push vals = do
+  (VArray arr) <- innerValue
+  replyM_ $ VArray (arr >< A.fromList vals)
 
