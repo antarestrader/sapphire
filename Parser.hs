@@ -239,15 +239,18 @@ paren :: TParser Exp
 paren = between open close expr
 
 -- | The list of actual arguments (expression) in a function call
-argumentList :: TParser [Exp]
-argumentList = between open close $ sepBy expr comma
+argumentList :: Bool -> TParser [Exp]
+argumentList False = between open close $ sepBy expr comma
+argumentList True = argumentList False <|> openList
+  where
+    openList = sepBy safeExpr comma
 
-argumentListExtended :: Exp -> TParser Exp
-argumentListExtended (Call exp str xs) = functionBlock >>= (\x -> return $ Call exp str (xs `appendList` x))
-argumentListExtended (Send exp str xs) = functionBlock >>= (\x -> return $ Send exp str (xs `appendList` x))
-argumentListExtended (Apply var xs) = functionBlock >>= (\x -> return $ Apply var (xs `appendList` x))
-argumentListExtended (EVar var) = functionBlock >>= (\x -> return $ Apply var [x])
-argumentListExtended _ = parserFail "Could not add a block to this expression"
+functionBlockExtend :: Exp -> TParser Exp
+functionBlockExtend (Call exp str xs) = functionBlock >>= (\x -> return $ Call exp str (xs `appendList` x))
+functionBlockExtend (Send exp str xs) = functionBlock >>= (\x -> return $ Send exp str (xs `appendList` x))
+functionBlockExtend (Apply var xs) = functionBlock >>= (\x -> return $ Apply var (xs `appendList` x))
+functionBlockExtend (EVar var) = functionBlock >>= (\x -> return $ Apply var [x])
+functionBlockExtend _ = parserFail "Could not add a block to this expression"
 
 appendList :: [a] -> a -> [a]
 appendList xs x = xs ++ [x]
@@ -299,9 +302,9 @@ var = do
 --
 --   __Notice__: Unlike all other extending parsers, 'args' cannot fail.  It is
 --   included in the set of basic parsers.
-args :: Var -> TParser Exp
-args var =
-  (argumentList >>= (\args->return (Apply var args))) <|> return (EVar var)
+args :: Bool-> Var -> TParser Exp
+args p var =
+  (argumentList p >>= (\args->return (Apply var args))) <|> return (EVar var)
 
 
 -- | a sequence of expressions seperated by operators
@@ -423,7 +426,7 @@ indexed exp = do
 called exp = do
   tdot
   s <- identifier
-  args <- option [] argumentList
+  args <- option [] $ argumentList True
   return $ Call exp s args
 
 -- | An extension paser loking for asyncronous method calls of the form
@@ -431,21 +434,34 @@ called exp = do
 sent exp = do
   tsend
   s <- identifier
-  args <- option [] argumentList
+  args <- option [] $ argumentList True
   return $ Send exp s args
+
+-- | expressions which can safely be understood as the first argument in an unenclosed argument list
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString
+
+safeExpr = do
+    exp <- safeExpr0
+    extend exp
+  where
+    extend exp = loop exp <|> return exp
+    safeExtension exp = indexed exp <|> called exp <|> sent exp
+    loop e = do
+      exp' <- safeExtension e
+      extend exp'
 
 -- | The union of all basic expressions
 expr0 :: TParser Exp
 expr0 = paren 
-     <|> nil <|> falseP <|> trueP 
-     <|> (var >>= args) <|> ivar  <|> atom   <|> float 
-     <|> int <|> exString <|> arrayLiteral <?> "basic expression unit"
+     <|> nil <|> falseP      <|> trueP 
+     <|> (var >>= args True) <|> ivar  <|> atom   <|> float 
+     <|> int <|> exString    <|> arrayLiteral <?> "basic expression unit"
 
 -- | The union of all extending parsers.  Given a base expression this
 --   parser will check the subsiquent token stream for extended forms such
 --   as assignment, indexing, method calls or operator strings. 
 extension :: Exp -> TParser Exp
-extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp <|> argumentListExtended exp
+extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp <|> functionBlockExtend exp
 
 -- | Basic expressions with extensions applied
 expr1 :: TParser Exp
