@@ -146,6 +146,9 @@ tend   = tokenEq TEnd >> return () <?> "End of Line"
 tsuper = tokenEq TSuper         <?> "<-"
 tstartI = tokenEq StartInterp
 tendI   = tokenEq EndInterp
+bar    = let tok t@Token {token = (TOperator "|")} = Just t
+             tok _ = Nothing
+          in tokenP tok  <?> "'|' (bar)"
 
 -- | If the next token is a block, treat it as Sapphire code and parse it
 --   returning a 'Block' expression.
@@ -238,6 +241,24 @@ paren = between open close expr
 -- | The list of actual arguments (expression) in a function call
 argumentList :: TParser [Exp]
 argumentList = between open close $ sepBy expr comma
+
+argumentListExtended :: Exp -> TParser Exp
+argumentListExtended (Call exp str xs) = functionBlock >>= (\x -> return $ Call exp str (xs `appendList` x))
+argumentListExtended (Send exp str xs) = functionBlock >>= (\x -> return $ Send exp str (xs `appendList` x))
+argumentListExtended (Apply var xs) = functionBlock >>= (\x -> return $ Apply var (xs `appendList` x))
+argumentListExtended (EVar var) = functionBlock >>= (\x -> return $ Apply var [x])
+argumentListExtended _ = parserFail "Could not add a block to this expression"
+
+appendList :: [a] -> a -> [a]
+appendList xs x = xs ++ [x]
+
+functionBlock :: TParser Exp
+functionBlock = do
+        keyword "do"
+        params <- option [] $ between bar bar $ sepBy identifier comma
+        exp <- block
+        return $ Lambda params exp
+
 
 -- | The list of formal parameters in a method/function defination
 paramList :: TParser [String]
@@ -424,7 +445,7 @@ expr0 = paren
 --   parser will check the subsiquent token stream for extended forms such
 --   as assignment, indexing, method calls or operator strings. 
 extension :: Exp -> TParser Exp
-extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp
+extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp <|> argumentListExtended exp
 
 -- | Basic expressions with extensions applied
 expr1 :: TParser Exp
@@ -432,7 +453,11 @@ expr1 = do
     exp <- expr0
     extend exp
   where
-    extend exp = (extension exp >>= extend) <|> return exp
+    extend exp = loop exp <|> return exp
+    loop e = do
+      exp' <- extension e
+      blk  <- getState
+      if (not blk) then extend exp' else return exp'
 
 -- | forms not subject to extending parsers. These parsers include their own
 --   intrensic check for line termination.
