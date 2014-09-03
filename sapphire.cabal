@@ -39,7 +39,8 @@ cabal-version:       >=1.10
 
 executable sapphire
   main-is: Main.hs             
-  other-modules:       Tokens
+  other-modules:       Tokens, Object, Parser, Eval, Array, AST, Boot, BuiltinFunctions,
+                       Context, LineParser, String, Var, Object.Graph, Object.Spawn
   other-extensions:    ScopedTypeVariables
                      , FlexibleContexts
                      , PolymorphicComponents
