@@ -9,6 +9,7 @@ import {-# SOURCE #-} AST
 import String
 import Array (Array)
 import qualified Array as A
+import Hash (Hash)
 import Var
 import Data.Foldable (toList)
 import qualified Continuation as C
@@ -24,6 +25,7 @@ data Value =
   | VFloat Double
   | VString SapString
   | VArray Array
+  | VHash Hash
   | VNil | VFalse | VTrue
   | VAtom String
   | VFunction{function::Fn, arity::Arity}
@@ -55,6 +57,7 @@ instance Show Value where
   show VFalse = "false"
   show (VAtom a) = ':':a
   show (VArray a) = show $ toList a
+  show (VHash h) = show $ h
   show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
   show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
   show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"

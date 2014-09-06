@@ -16,10 +16,12 @@ import Var
 import String
 import Context
 import Array.BuiltinFunctions (arrayClass)
+import Hash.BuiltinFunctions (hashClass)
 
 initialize :: [Value] -> EvalM ()
 initialize _ = do
   arrayClass
+  hashClass
   replyM_ VNil
 
 binop :: (forall a. Num a => a->a->a) -> [Value] -> EvalM ()
