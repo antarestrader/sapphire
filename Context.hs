@@ -15,6 +15,7 @@
 
 module Context 
   ( Context( self )
+  , modifySelf
   , dispatchC
   , dispatchC_
   , dispatchM
@@ -137,26 +138,32 @@ canReply = not `fmap` hasReply
 -- | Given an action that sets a reply value, run that action capturing the 
 --   reply value.  This replaces the replier with a temporary one so the reply
 --   is not propigated to the outside context.
+--
+-- Note to self: looking at this code later I'm not sure it is all completely thought through
+-- if there is a deadlock bug, look here.
 extract :: (MonadState Context m, MonadIO m) => m () -> m Value
-extract act = do
+extract act = do 
   cOld@Context{continuation = cont} <- get
   r <- liftIO newEmptyTMVarIO
-  let cNew = cOld{continuation = cont{replier = r}}
-  put cNew
+  modify (\ctx -> ctx{continuation = cont{replier = r}})
   act
-  put cOld{self = (self cNew)}
+  modify (\ctx -> ctx{continuation = cont}) -- return the old continuation
   liftIO $ atomically $ readTMVar r
 
 -- | Evaluate a method with the given object as self.  Returns bother the result
 --   and a potentially modified version of the object.
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
-  context <- get
-  put context{self=obj}
+  self' <- gets self
+  modifySelf $ const obj 
   a <- f
   obj' <- gets self
-  put context
+  modifySelf $ const self'
   return (a, obj')
+
+-- | update the @self@ object of the current context
+modifySelf ::  (MonadState Context m) => (Object -> Object) -> m ()
+modifySelf f = modify (\context -> context{self = f $ self context})
 
 lookupLocals :: String -> Context -> Maybe Value
 lookupLocals s Context{locals = l} = M.lookup s l

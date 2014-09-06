@@ -243,7 +243,7 @@ argumentList :: Bool -> TParser [Exp]
 argumentList False = between open close $ sepBy expr comma
 argumentList True = argumentList False <|> openList
   where
-    openList = sepBy safeExpr comma
+    openList = sepBy1 safeExpr comma
 
 functionBlockExtend :: Exp -> TParser Exp
 functionBlockExtend (Call exp str xs) = functionBlock >>= (\x -> return $ Call exp str (xs `appendList` x))
@@ -348,7 +348,7 @@ assign lhs' = do
 transLHS :: Exp -> TParser LHS
 transLHS (EVar v) = return $ LVar v --TODO add indexed, called, and sent here
 transLHS (EIVar s) = return $ LIVar s
-transLHS _ = fail "illigal Left Hand Side of assignment expression"
+transLHS exp = fail $ "illigal Left Hand Side of assignment expression: " ++ (show exp)
 
 ifParser :: TParser Exp
 ifParser = do

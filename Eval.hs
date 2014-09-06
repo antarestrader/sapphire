@@ -83,6 +83,7 @@ eval (EString s) = return $ VString $ mkStringLiteral s
 eval (EIVar s) = do
   val <- gets self >>= lookupIVarsM s 
   return $ maybe VNil id val
+
 eval (EVar var) = lookupVar var
 
 eval (OpStr a ops) = do
@@ -95,16 +96,18 @@ eval (Assign lhs exp) = do
   return val
 
 eval (Call expr msg args) = do
-  val <- eval expr
+  (val,f) <- evalWithContext expr
   r <-  valToObj val
   vals <- mapM eval args
   case r of 
     Pid pid -> dispatchM pid (Execute (simple msg) vals)
-    receiver -> fmap fst $ with receiver $ do 
-      (method, arity) <- fnFromVar (simple msg)
-      guard $ checkArity arity $ length vals
-      extract $ method vals -- proper tail calls here
-    -- TODO put self back (see issue #28 on github)
+    receiver -> do
+      (result, obj') <- with receiver $ do
+        (method, arity) <- fnFromVar (simple msg)
+        guard $ checkArity arity $ length vals
+        extract $ method vals -- proper tail calls here
+      f $ VObject obj' -- update self
+      return result
 
 eval (Index expr arg) = do
   val <- eval expr
@@ -164,6 +167,23 @@ eval (EArray xs) = do
 
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
+-- | Eval with context update
+--   When an expression could destructivally modify a sub-expression, it is
+--   necessary to provide a way to modify the context with the new value.  The
+--   second return value is a function that will replace the value of the evaluated
+--   object with the given value.
+
+evalWithContext :: Exp -> EvalM (Value, Value ->EvalM ())
+evalWithContext (EIVar str) = do
+  val <- gets self >>= lookupIVarsM str
+  case val of
+    Nothing -> return (VNil, (\_-> return ()))
+    Just v -> return (v, (\val -> modifySelf $ insertIVarLocal str val))
+evalWithContext (EVar var) = lookupVarContext var
+-- TODO: evalWithContext (Call exp str args)
+evalWithContext exp = do --by default we do not modify the context
+  val <- eval exp
+  return (val, \_ -> return ())
 
 -- | Eval with tail calls
 --   Like @eval@ but places the result in the the response of the continuation

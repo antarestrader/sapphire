@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-
+-- | This module impliments the consept of non local objects.  
 module Object.Spawn (
     spawn
   , responderObject 
@@ -21,6 +21,7 @@ import Control.Concurrent.STM
 import Data.Maybe
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
+-- | convert a value into a non-local object (aka a PID)
 spawn :: Value -> IO Object
 spawn (VObject obj@(Pid {})) = return obj
 spawn (VObject obj) | isJust (process obj) = return $ Pid $ fromJust $ process obj
@@ -37,6 +38,7 @@ responderPrim val msg = do  --TODO actually do something here
   C.reply (snd msg) $ val
   return val
 
+-- | This is the function responcible for dealing with incomming messages
 responderObject :: C.Responder Object Message Value
 responderObject obj msg =
   case fst msg of

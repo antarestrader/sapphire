@@ -13,6 +13,7 @@ import Parser
 import Eval
 import Context
 import Continuation(newContIO)
+import Var (simple)
 import Boot(boot)
 import Text.Regex.Posix
 
@@ -29,11 +30,13 @@ repl c = do
   case l of
     "" -> system c
     _  -> do
-           result <- runEvalM (evaluate l) c
+           result <- flip runEvalM c $ do
+                     r <- evaluate l
+                     eval $ Apply (simple "puts") [EValue r]
            case result of
              Left  err -> putStrLn ("Error: " ++ err) >> repl c
              Right (val,c') -> do
-               putStrLn $ show val
+               -- putStrLn $ show val
                repl $ merge [("it", val)] c'
 
 parserREPL :: Context -> IO ()

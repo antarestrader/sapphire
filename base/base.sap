@@ -33,4 +33,5 @@ class Array
       fn val
 
   def push!(v)
-    @__value = push v 
+    @__value = push v
+    self
