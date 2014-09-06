@@ -27,9 +27,8 @@ data Exp =
     --   in Eval.hs.
   | OpStr Exp [(Op,Exp)]
   | Index Exp Exp -- ^ an expression followed by an index (foo[3])
-  | Lambda [String] Exp -- ^ an anonymous function declairation
-  | Define LHS [String] Exp -- ^ a named function declairation
-  | Def String [String] Exp -- ^ a method declairartion
+  | Lambda [Parameter] Exp -- ^ an anonymous function declairation
+  | Def String [Parameter] Exp -- ^ a method declairartion
   | Apply Var [Exp] -- ^ application of the actual params [Exp] to the function found at var
   | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
   | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
@@ -60,5 +59,12 @@ data LHS =
   | LCall Exp String
   | LSend Exp String deriving Show
 
+data Parameter = 
+    Param String
+  | Default String Exp
+  | VarArg String
+    deriving (Show)
 
-
+getParamName (Param n) = n
+getParamName (VarArg n) = n
+getParamName (Default n _) = n

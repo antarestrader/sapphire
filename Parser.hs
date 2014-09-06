@@ -149,6 +149,9 @@ tendI   = tokenEq EndInterp
 bar    = let tok t@Token {token = (TOperator "|")} = Just t
              tok _ = Nothing
           in tokenP tok  <?> "'|' (bar)"
+star   = let tok t@Token {token = (TOperator "*")} = Just t
+             tok _ = Nothing
+          in tokenP tok  <?> "'*' (star)"
 
 -- | If the next token is a block, treat it as Sapphire code and parse it
 --   returning a 'Block' expression.
@@ -258,7 +261,7 @@ appendList xs x = xs ++ [x]
 functionBlock :: TParser Exp
 functionBlock = do
         keyword "do"
-        params <- option [] $ between bar bar $ sepBy identifier comma
+        params <- option [] $ between bar bar $ sepBy parameter comma
         exp <- block
         return $ Lambda params exp
 
@@ -266,8 +269,15 @@ functionBlock = do
 -- | The list of formal parameters in a method/function defination
 --
 --   improving this parser is the first step to Github Issue #29
-paramList :: TParser [String]
-paramList = between open close $ sepBy identifier comma
+paramList :: TParser [Parameter]
+paramList = between open close $ sepBy parameter comma
+
+parameter :: TParser Parameter
+parameter = vararg <|> param
+  where
+    vararg = star >> fmap VarArg identifier
+    param = fmap Param identifier >>= hasDefault
+    hasDefault (Param str) = (assignP >> fmap (Default str) safeExpr) <|> (return $ Param str)
 
 arrayLiteral :: TParser Exp
 arrayLiteral = do 

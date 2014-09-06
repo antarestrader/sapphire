@@ -44,6 +44,7 @@ import String
 import qualified Array as A
 import Context
 import Var
+import Utils
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.State
@@ -104,7 +105,7 @@ eval (Call expr msg args) = do
     receiver -> do
       (result, obj') <- with receiver $ do
         (method, arity) <- fnFromVar (simple msg)
-        guard $ checkArity arity $ length vals
+        guardR  "Wrong number of arguments." $ checkArity arity $ length vals
         extract $ method vals -- proper tail calls here
       f $ VObject obj' -- update self
       return result
@@ -118,7 +119,7 @@ eval (Index expr arg) = do
 
 eval (Apply var args) = do
   (fn, arity) <- fnFromVar var
-  guard $ checkArity arity $ length args
+  guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
   extract $ fn vals -- extract impliments proper tail recursion
 
@@ -126,14 +127,13 @@ eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
   case fn of
     VFunction fn' arity -> do
-       guard $ checkArity arity $ length args
+       guardR "Wrong number of arguments." $ checkArity arity $ length args
        vals <- mapM eval args
        extract $ fn' vals
     obj -> eval (Call (EValue obj) "call" args)
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
-eval (Define lhs params exp) = eval $ Assign lhs (Lambda params exp)
-eval (Lambda params exp) = return (VFunction (mkFunct params exp) (length params, Just $ length params)) -- no varargs for now
+eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
 eval (Block exps) = fmap last $ mapM eval exps
 
@@ -193,7 +193,7 @@ evalWithContext exp = do --by default we do not modify the context
 evalT ::  Exp -> EvalM ()
 evalT (Apply var args) = do
   (fn, arity) <- fnFromVar var
-  guard $ checkArity arity $ length args
+  guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
   fn vals
 evalT (Call  expr msg args) = do
@@ -204,7 +204,7 @@ evalT (Call  expr msg args) = do
     Pid pid -> tailM pid (Execute (simple msg) vals)
     receiver -> fmap fst $ with receiver $ do 
       (method, arity) <- fnFromVar (simple msg)
-      guard $ checkArity arity $ length vals
+      guardR "Wrong number of arguments." $ checkArity arity $ length vals
       method vals
     -- TODO put self back (see issue #28 on github)
 evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exps) 
@@ -227,9 +227,9 @@ fnFromVar :: Var -> EvalM (Fn, Arity)
 fnFromVar var = do
   val <- lookupVar var
   case val of
-    (VFunction fn arity) -> return (fn, arity)
+    VFunction{function=fn, arity=arity} -> return (fn, arity)
     (VError _) -> throwError $ "Function or Method not found: " ++ show var
-    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (1,Nothing))
+    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (1,Nothing)) -- fixme
 
 -- | The inner workings of Class creation
 --
@@ -260,13 +260,25 @@ buildClass n super exp = do
   return $ VObject $ Pid pid
 
 -- | The internal working so making a function
-mkFunct :: [String]  -- formal parameters (TODO improve see issue #29)
+mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)
         -> Exp       -- the expression to be evaluated (typically a block)
         -> [Value]   -- the actual parameters
         -> EvalM ()  -- the resulting value is placed in the replier
 mkFunct params exp vals = do
-  c <- get
-  using (merge (zip params vals) c) (evalT exp) -- Use evalT for proper tail calls
+    c <- get
+    ps <- assignParams params vals
+    using (merge ps c) (evalT exp) -- Use evalT for proper tail calls
+  where
+    assignParams :: [Parameter] -> [Value] -> EvalM [(String,Value)]
+    assignParams [] [] = return []
+    assignParams [] _ = throwError "Function called with too many arguments"
+    assignParams ((Param str):ps) [] = throwError "Function called with too few arguments"
+    assignParams ((Default str exp):ps) [] = do
+      val <- eval exp
+      ps' <- assignParams ps []
+      return $ (str, val):ps'
+    assignParams [VarArg str] vs = return $ [(str,VArray(A.fromList vs))]
+    assignParams (p:ps) (v:vs) = assignParams ps vs >>= (\ps'-> return $ (getParamName p, v):ps') 
 
 -- | Part of the process of applying a function is to set the formal parameters
 --   equal to the actual parameters.  Once accomplished, a new context is
@@ -280,6 +292,15 @@ using c evalm = do
   slf <- gets self
   put cOld{self = (slf)}
   return resp
+
+mkArity :: [Parameter] -> Arity
+mkArity params = loop (len,Just len) $ reverse params
+  where
+    len = length params
+    loop a [] = a
+    loop (min,_)   ((VarArg _):ps)    = loop (min-1,Nothing) ps
+    loop (min,max) ((Default _ _):ps) = loop (min-1,max) ps
+    loop a         ((Param _):_)      = a -- halt at the first non-optional param
 
 -- Impliments the Shunting-yard Algorithm
 -- of Edsger Dijstra as described at
