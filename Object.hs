@@ -26,7 +26,7 @@ data Value =
   | VArray Array
   | VNil | VFalse | VTrue
   | VAtom String
-  | VFunction Fn Arity
+  | VFunction{function::Fn, arity::Arity}
   | VObject Object -- may want to make this strict in Object
   | VError String
 

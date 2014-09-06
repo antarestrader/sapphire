@@ -83,6 +83,9 @@ valToObj val@(VString _) = do
 valToObj val@(VArray _) = do
   cls <- getPrimClass "Array"
   return $ buildPrimInstance cls val
+valToObj val@(VFunction{}) = do
+  cls <- getPrimClass "Function"
+  return $ buildPrimInstance cls val
 valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
 
 -- | lookup the class for primitive values in the current context.

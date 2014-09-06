@@ -264,6 +264,8 @@ functionBlock = do
 
 
 -- | The list of formal parameters in a method/function defination
+--
+--   improving this parser is the first step to Github Issue #29
 paramList :: TParser [String]
 paramList = between open close $ sepBy identifier comma
 
@@ -407,6 +409,14 @@ defParser = do
   exp <- block
   return $ Def n ps exp
 
+defineParser :: TParser Exp
+defineParser = do
+  keyword "define"
+  n <- identifier
+  ps <- option [] $ paramList
+  exp <- block
+  return $ Assign (LIVar n) (Lambda ps exp)
+
 lambda :: TParser Exp
 lambda = do
   let single = do
@@ -477,7 +487,7 @@ expr1 = do
 
 -- | forms not subject to extending parsers. These parsers include their own
 --   intrensic check for line termination.
-statement = lambda <|> ifParser <|> defParser <|> classParser
+statement = lambda <|> ifParser <|> defParser <|> defineParser <|> classParser
 
 -- | All possible forms of a single expression
 expr = statement <|> expr1
