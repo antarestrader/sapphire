@@ -305,6 +305,12 @@ identifier = tokenP tok
     tok Token {token=TVar v} = Just v
     tok _ = Nothing
 
+stringT :: TParser String
+stringT = tokenP tok
+  where
+    tok Token {token=TString s} = Just s
+    tok _ = Nothing
+
 -- | An undecorated variable (@foo@) possibally scopped (@Foo::bar@)
 --   
 --   __Notice__: This parser does not stand on it own but relies on the special
@@ -427,7 +433,7 @@ classParser = do
 defParser :: TParser Exp
 defParser = do
   keyword "def"
-  n <- identifier
+  n <- identifier <|> stringT
   ps <- option [] $ paramList
   exp <- block
   return $ Def n ps exp

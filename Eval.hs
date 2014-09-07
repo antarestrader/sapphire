@@ -116,7 +116,7 @@ eval (Index expr arg) = do
   val <- eval expr
   idx <- eval arg
   case (val,idx) of
-    (VArray a, VInt i) -> return (if (fromInteger i) < A.length a then a `A.index` fromInteger i else VNil)
+    (VArray a, VInt i) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,i) -> eval (Call (EValue v) "[]" [EValue i])
 
 eval (Apply var args) = do

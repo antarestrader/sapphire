@@ -38,6 +38,7 @@ module Object.Graph (
   -- * Assignment / Mutation Functions
   , insertLHS
   , insertIVar
+  , insertIVarM
   , insertCVar
 
   -- * Local Functions Exported for Object.Spawn
@@ -255,6 +256,10 @@ insertIVar :: String -> Value -> Object -> EvalM Object
 insertIVar _ _ ROOT  = throwError $ "Inserting into ROOT not allowed, (How the hell did you get your hands on ROOT?)"
 insertIVar str val obj@(Pid p) = insertIVarRemote str val p >> return obj
 insertIVar str val obj = return $ obj{ivars= (M.insert str val (ivars obj))}
+
+-- | Overwrite a IVar of self in the current context with the new value
+insertIVarM :: String -> Value -> EvalM ()
+insertIVarM str val = modifySelf (insertIVarLocal str val)
 
 insertIVarLocal str val obj = obj{ivars= (M.insert str val (ivars obj))}
 
