@@ -16,6 +16,7 @@ data Exp =
   | ExString [Exp] -- ^ concat all elements together as a string
   | EAtom String -- ^ atom literal (:foo)
   | EArray [Exp] -- ^ an Array Literal
+  | EHash  [(Exp,Exp)] -- ^ a Hash Literal 
   | EIVar String -- ^ Named istance variable (\@foo)
   | ENil | EFalse | ETrue
     -- | Operator embeded Equation

@@ -88,6 +88,7 @@ data T =
   TAssign | TComma |
   TAssignOp String |
   TAtom  String    |
+  THashAtom String |
   TLabel String    |
   TOperator String |
   TString String   |

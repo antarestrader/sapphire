@@ -152,6 +152,9 @@ bar    = let tok t@Token {token = (TOperator "|")} = Just t
 star   = let tok t@Token {token = (TOperator "*")} = Just t
              tok _ = Nothing
           in tokenP tok  <?> "'*' (star)"
+rocket = let tok t@Token {token = (TOperator "=>")} = Just t
+             tok _ = Nothing
+          in tokenP tok  <?> "'=>' (Hash Rocket)"
 
 -- | If the next token is a block, treat it as Sapphire code and parse it
 --   returning a 'Block' expression.
@@ -284,12 +287,28 @@ arrayLiteral = do
   xs <- between bopen bclose $ sepBy expr comma
   return $ EArray xs
 
+hashLiteral :: TParser Exp
+hashLiteral = fmap EHash $ between copen cclose $ sepBy hash comma
+  where
+    hash :: TParser (Exp,Exp)
+    hash = do
+      key <- safeExpr -- we may need to relax these requirments
+      rocket
+      value <- safeExpr
+      return (key,value)
+
 -- | An identifier without scope. It forms the bases for a number of named
 --   things. (classes, defs, vars, function application, method calles, etc)
 identifier :: TParser String
 identifier = tokenP tok
   where
     tok Token {token=TVar v} = Just v
+    tok _ = Nothing
+
+stringT :: TParser String
+stringT = tokenP tok
+  where
+    tok Token {token=TString s} = Just s
     tok _ = Nothing
 
 -- | An undecorated variable (@foo@) possibally scopped (@Foo::bar@)
@@ -414,7 +433,7 @@ classParser = do
 defParser :: TParser Exp
 defParser = do
   keyword "def"
-  n <- identifier
+  n <- identifier <|> stringT
   ps <- option [] $ paramList
   exp <- block
   return $ Def n ps exp
@@ -458,7 +477,7 @@ sent exp = do
   return $ Send exp s args
 
 -- | expressions which can safely be understood as the first argument in an unenclosed argument list
-safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString <|> arrayLiteral <|> hashLiteral
 
 safeExpr = do
     exp <- safeExpr0
@@ -475,7 +494,7 @@ expr0 :: TParser Exp
 expr0 = paren 
      <|> nil <|> falseP      <|> trueP 
      <|> (var >>= args True) <|> ivar  <|> atom   <|> float 
-     <|> int <|> exString    <|> arrayLiteral <?> "basic expression unit"
+     <|> int <|> exString    <|> arrayLiteral <|> hashLiteral <?> "basic expression unit"
 
 -- | The union of all extending parsers.  Given a base expression this
 --   parser will check the subsiquent token stream for extended forms such

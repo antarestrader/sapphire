@@ -42,6 +42,8 @@ import Object.Graph
 import Object.Spawn
 import String
 import qualified Array as A
+import Hash
+import Hash.BuiltinFunctions
 import Context
 import Var
 import Utils
@@ -114,7 +116,7 @@ eval (Index expr arg) = do
   val <- eval expr
   idx <- eval arg
   case (val,idx) of
-    (VArray a, VInt i) -> return (if (fromInteger i) < A.length a then a `A.index` fromInteger i else VNil)
+    (VArray a, VInt i) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,i) -> eval (Call (EValue v) "[]" [EValue i])
 
 eval (Apply var args) = do
@@ -161,9 +163,18 @@ eval (ExString xs) = do
       v' <- eval (Call (EValue val) "to_s" [])
       vToStr v'
 eval (EArray []) = return $ VArray $ A.empty
-eval (EArray xs) = do 
+eval (EArray xs) = do
   x's <-  mapM eval xs
   return $ VArray $ A.fromList x's
+
+eval (EHash xs) = do
+  let f (a,b) = do
+        a' <- eval a
+        b' <- eval b
+        return (a',b')
+  x's <- mapM f xs
+  hash <- buildHashFromList x's
+  return $ VHash hash
 
 eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
 
