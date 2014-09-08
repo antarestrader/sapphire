@@ -240,7 +240,8 @@ fnFromVar var = do
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
     (VError _) -> throwError $ "Function or Method not found: " ++ show var
-    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (1,Nothing)) -- fixme
+    VNil  -> throwError $ "Function or Method not found: " ++ show var
+    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
 
 -- | The inner workings of Class creation
 --

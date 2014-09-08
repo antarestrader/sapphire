@@ -33,6 +33,7 @@ repl c = do
            result <- flip runEvalM c $ do
                      r <- evaluate l
                      eval $ Apply (simple "puts") [EValue r]
+                     return r
            case result of
              Left  err -> putStrLn ("Error: " ++ err) >> repl c
              Right (val,c') -> do
@@ -72,6 +73,7 @@ commands = [
   , Cmd "(q|quit)"            "[q]uit         :  exit the program"     quiter
   , Cmd "(h|help|\\?)"        "[h]elp (?)     :  display this message" helper
   , Cmd "load (.*)"           "load <file>    :  load and evaluate the file" interperter
+  , Cmd "debug[ ]*(.*)"       "debug [Object] :  print IVars for Object or local binding is ommited" debugger
   ]
 
 interperter [""] c = repl c
@@ -115,6 +117,24 @@ system c = do
         [ys] -> (fn x) (tail ys) c
   m l commands
 
+debugger [""] c = do
+  flip runEvalM c $ do
+    m <- debugM
+    liftIO $ putStrLn $ show m
+  interperter [""] c
+debugger [obj] c = do
+  flip runEvalM c $ do
+    val <- eval (EVar $ simple obj)
+    case val of 
+      VObject (Object{ivars = i}) -> do
+        liftIO $ putStrLn $ show i
+      VObject (Class{ivars = i, cvars = c}) -> liftIO $ do
+        putStrLn "IVars:"
+        putStrLn $ show i
+        putStrLn "CVars:"
+        putStrLn $ show c
+      v -> liftIO $ putStrLn $ show v
+  interperter [""] c
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of

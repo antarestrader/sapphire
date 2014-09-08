@@ -77,3 +77,16 @@ to_s [] = do
 to_s_Class [] = do
   (VObject Class{properName = s}) <- eval (EVar Self)
   replyM_ $ VString $ mkStringLiteral $ s
+
+debug _ = do
+   val <- eval (EVar Self)
+   case val of 
+      VObject (Object{ivars = i}) -> do
+        liftIO $ putStrLn $ show i
+      VObject (Class{ivars = i, cvars = c}) -> liftIO $ do
+        putStrLn "IVars:"
+        putStrLn $ show i
+        putStrLn "CVars:"
+        putStrLn $ show c
+      v -> liftIO $ putStrLn $ show v
+   replyM_ VNil

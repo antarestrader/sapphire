@@ -31,6 +31,7 @@ module Context
   , merge
   , hasReply, canReply
   , extract
+  , debugM
   ) where
 
 import Prelude hiding (tail)
@@ -179,3 +180,6 @@ insertLocals s val c@Context {locals=l} =
 merge :: [(String,Value)] -> Context -> Context
 merge params  c@Context {locals=l} = 
   c{locals = M.union (M.fromList params) l} 
+
+debugM :: (MonadState Context m) => m (M.Map String Value) 
+debugM = gets locals

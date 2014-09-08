@@ -477,7 +477,7 @@ sent exp = do
   return $ Send exp s args
 
 -- | expressions which can safely be understood as the first argument in an unenclosed argument list
-safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString <|> arrayLiteral <|> hashLiteral
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString  
 
 safeExpr = do
     exp <- safeExpr0
