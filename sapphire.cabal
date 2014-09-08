@@ -63,7 +63,6 @@ executable sapphire
                      , Builtin.Integer
                      , Builtin.Object
                      , Builtin.Utils
-                     , Builtin.Value
 
   other-extensions:    ScopedTypeVariables
                      , FlexibleContexts
