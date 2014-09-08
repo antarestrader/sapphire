@@ -1,4 +1,4 @@
-module Hash.BuiltinFunctions where
+module Builtin.Hash where
 
 import Control.Monad.Error
 import Control.Monad.State
@@ -9,7 +9,7 @@ import Hash
 import Object
 import Object.Graph
 import String
-import Utils.Builtins
+import Builtin.Utils
 import Context (self, replyM_)
 import {-# SOURCE #-} Eval
 import AST

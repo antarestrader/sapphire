@@ -43,7 +43,7 @@ import Object.Spawn
 import String
 import qualified Array as A
 import Hash
-import Hash.BuiltinFunctions
+import Builtin.Hash
 import Context
 import Var
 import Utils

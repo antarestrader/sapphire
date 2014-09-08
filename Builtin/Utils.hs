@@ -1,4 +1,4 @@
-module Utils.Builtins where
+module Builtin.Utils where
 
 import qualified Data.Map as M
 import Control.Monad.IO.Class
@@ -8,7 +8,7 @@ import Object
 import AST
 import Context (self, replyM_)
 import Object.Graph (lookupIVarsM)
-import Object.Spawn (spawn)
+import {-# SOURCE #-} Object.Spawn (spawn)
 import Var (simple)
 
 innerValue :: EvalM Value
@@ -33,8 +33,8 @@ buildClass name bootstrap = do
           , cvars = bootstrap
           , properName = name
           }
-  Pid pid <- liftIO $ spawn cls
+  pid <- liftIO $ spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
-  eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject $ Pid pid]
-  return $ Pid pid
+  eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
+  return pid
 

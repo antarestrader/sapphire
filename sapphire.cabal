@@ -38,9 +38,33 @@ extra-source-files:  Readme.md
 cabal-version:       >=1.10
 
 executable sapphire
-  main-is: Main.hs             
-  other-modules:       Tokens, Object, Parser, Eval, Array, AST, Boot, BuiltinFunctions,
-                       Context, LineParser, String, Var, Object.Graph, Object.Spawn
+  main-is:             Main.hs             
+  other-modules:     Tokens
+                     , Array
+                     , AST
+                     , Boot 
+                     , Context
+                     , Continuation
+                     , Eval
+                     , Hash
+                     , Lexer
+                     , LineParser
+                     , Object
+                     , Parser
+                     , String
+                     , Utils
+                     , Var
+                     , Object.Graph
+                     , Object.Spawn
+                     , Builtin.Array
+                     , Builtin.Bindings
+                     , Builtin.Class
+                     , Builtin.Hash
+                     , Builtin.Integer
+                     , Builtin.Object
+                     , Builtin.Utils
+                     , Builtin.Value
+
   other-extensions:    ScopedTypeVariables
                      , FlexibleContexts
                      , PolymorphicComponents

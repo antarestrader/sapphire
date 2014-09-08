@@ -2,7 +2,7 @@
 
 -- | This module exports the functions needed to bootstrap the Array Class.
 
-module Array.BuiltinFunctions where
+module Builtin.Array where
 
 import Prelude hiding (length)
 import qualified Array as A
@@ -13,7 +13,7 @@ import Object.Graph (lookupIVarsM)
 import Object.Spawn (spawn)
 import Eval
 import AST
-import Utils.Builtins
+import Builtin.Utils
 import Var (simple)
 import Context (self, replyM_)
 import Control.Monad.State (gets)

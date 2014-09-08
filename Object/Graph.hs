@@ -62,6 +62,7 @@ import Control.Monad.Error.Class
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import {-# SOURCE #-} Builtin.Bindings
 
 -- |  This function turns a 'Value' into an 
 --   'Object' as its name would imply. In order to turn primitive values into
@@ -72,46 +73,8 @@ import Data.Maybe
 --   be retuneded to a primitive value.
 valToObj :: Value -> EvalM Object
 valToObj (VObject obj) = return obj
-valToObj val@(VInt _) = do
-  cls <- getPrimClass "Number" 
-  return $ buildPrimInstance cls val
-valToObj VNil = do
-  cls <- getPrimClass "NilClass"
-  return $ buildPrimInstance cls VNil
-valToObj val@(VString _) = do
-  cls <- getPrimClass "String"
-  return $ buildPrimInstance cls val
-valToObj val@(VArray _) = do
-  cls <- getPrimClass "Array"
-  return $ buildPrimInstance cls val
-valToObj val@(VFunction{}) = do
-  cls <- getPrimClass "Function"
-  return $ buildPrimInstance cls val
-valToObj val@(VHash _) = do
-  cls <- getPrimClass "Hash"
-  return $ buildPrimInstance cls val
-valToObj val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
+valToObj val = bindPrimitiveObject val
 
--- | lookup the class for primitive values in the current context.
---   (internal function)
-getPrimClass :: String -> EvalM Object
-getPrimClass str = do
-  cls' <- (eval $ EVar $ simple str)
-  case cls' of
-    (VObject obj) -> return obj
-    _ -> throwError $ "System Error: Primitive class not found: " ++ str
-
--- | Given the primitive class and a primitive value build in instance.
---   (internal function)
-buildPrimInstance :: Object -- the class
-                  -> Value  -- the value
-                  -> Object
-buildPrimInstance cls val = Object 
-                          { ivars = M.singleton "__value" val
-                          , klass = cls
-                          , modules = []
-                          , process = Nothing
-                          }
 -- | The most general form of lookup, this function finds the value at Var 
 --   in the the current context.  If nothing is fount it returnd 'VNil'.
 lookupVar :: Var -> EvalM Value
@@ -282,11 +245,11 @@ insertCVarRemote str val p = sendM p (SetCVar str val)
 precedence :: Context -> M.Map Op Precedence
 precedence _ = -- TODO read from Context
   M.fromList [
-      ("+",(6,L,N))
-    , ("-",(6,L,N))
-    , ("*",(7,L,N))
-    , ("/",(7,L,N))
-    , ("<",(4,N,N))
+      ("+",(6,L,L))
+    , ("-",(6,L,L))
+    , ("*",(7,L,L))
+    , ("/",(7,L,L))
+    , ("<",(4,N,L))
     , (">",(4,N,L))
     , ("==",(4,N,L))
   ]
