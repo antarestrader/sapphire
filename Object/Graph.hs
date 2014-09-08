@@ -245,13 +245,19 @@ insertCVarRemote str val p = sendM p (SetCVar str val)
 precedence :: Context -> M.Map Op Precedence
 precedence _ = -- TODO read from Context
   M.fromList [
-      ("+",(6,L,L))
-    , ("-",(6,L,L))
-    , ("*",(7,L,L))
-    , ("/",(7,L,L))
-    , ("<",(4,N,L))
-    , (">",(4,N,L))
-    , ("==",(4,N,L))
+      ("+",(9,L,L))
+    , ("-",(9,L,L))
+    , ("*",(10,L,L))
+    , ("/",(10,L,L))
+    , ("%",(10,L,L))
+    , ("<",(7,N,L))
+    , (">",(7,N,L))
+    , (">=",(7,N,L))
+    , ("<=",(7,N,L))
+    , ("==",(6,N,L))
+    , ("!=",(6,N,L))
+    , ("&&",(2,L,L))
+    , ("||",(1,L,L))
   ]
 
 

@@ -1,6 +1,6 @@
 module Builtin.Object where
 
-import Builtin.Utils
+import Builtin.Utils hiding (call)
 import Builtin.Bindings (initialize)
 import Object
 import AST

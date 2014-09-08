@@ -38,3 +38,14 @@ buildClass name bootstrap = do
   eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
   return pid
 
+mkBool :: Bool -> Value
+mkBool True = VTrue
+mkBool False = VFalse
+
+call :: Value -> String -> [Value] -> EvalM Value
+call target msg args = eval $ Call (EValue target) msg args'
+  where args' = map EValue args
+
+callT :: Value -> String -> [Value] -> EvalM ()
+callT target msg args = evalT $ Call (EValue target) msg args'
+  where args' = map EValue args

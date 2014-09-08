@@ -9,6 +9,8 @@ import Context
 import Builtin.Array
 import Builtin.Hash
 import Builtin.Integer
+import Builtin.Real
+import Builtin.Bool
 import Object
 import qualified Data.Map as M
 import Control.Monad.Error
@@ -18,6 +20,8 @@ initialize _ = do
   arrayClass
   hashClass
   integerClass
+  realClass
+  boolClasses
   replyM_ VNil
 
 bindPrimitiveObject ::  Value -> EvalM Object
@@ -41,6 +45,12 @@ bindPrimitiveObject val@(VFunction{}) = do
   return $ buildPrimInstance cls val
 bindPrimitiveObject val@(VHash _) = do
   cls <- getPrimClass "Hash"
+  return $ buildPrimInstance cls val
+bindPrimitiveObject val@(VTrue) = do
+  cls <- getPrimClass "TrueClass"
+  return $ buildPrimInstance cls val
+bindPrimitiveObject val@(VFalse) = do
+  cls <- getPrimClass "FalseClass"
   return $ buildPrimInstance cls val
 bindPrimitiveObject val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
 
