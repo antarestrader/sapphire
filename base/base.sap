@@ -46,3 +46,7 @@ class Array
   def push!(v)
     @__value = push v
     self
+
+class Integer
+  def "!="(b)
+    (self == b).not

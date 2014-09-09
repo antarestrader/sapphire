@@ -16,6 +16,8 @@ bootstrap = M.fromList [
   , ("/", VFunction sapDiv (1,Just 2))
   , ("<", VFunction lt (1,Just 2))
   , (">", VFunction gt (1,Just 2))
+  , ("<=", VFunction lte (1,Just 2))
+  , (">=", VFunction gte (1,Just 2))
   , ("==", VFunction eq (1,Just 2))
   ]
 
@@ -125,7 +127,47 @@ gt [val] = do
 gt (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to compare "++(show slf)++" and "++(string ss) 
+  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
+
+gte ((VInt b):[]) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (a>=b)
+gte ((VFloat b):[]) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (fromIntegral a>=b)
+gte ((VInt b):_) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (b>=a)
+gte ((VFloat b):_) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (b>=fromIntegral a)
+gte [val] = do
+  slf <- innerValue
+  callT val ">=" [slf,VTrue]
+gte (val:_) = do
+  slf <- innerValue
+  (VString ss) <- call val "to_s" []
+  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
+
+lte ((VInt b):[]) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (a<=b)
+lte ((VFloat b):[]) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (fromIntegral a<=b)
+lte ((VInt b):_) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (b<=a)
+lte ((VFloat b):_) = do
+  (VInt a) <- innerValue
+  replyM_ $ mkBool (b<=fromIntegral a)
+lte [val] = do
+  slf <- innerValue
+  callT val "<=" [slf,VTrue]
+lte (val:_) = do
+  slf <- innerValue
+  (VString ss) <- call val "to_s" []
+  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
 
 eq ((VInt b):_) = do
   (VInt a) <- innerValue

@@ -39,6 +39,9 @@ tokens :-
  <0, interp> "="                     {\s -> makeToken $ TAssign}
  <0, interp> "=="                    {\s -> makeToken $ TOperator s}
  <0, interp> "==="                   {\s -> makeToken $ TOperator s}
+ <0, interp> "<="                    {\s -> makeToken $ TOperator s}
+ <0, interp> ">="                    {\s -> makeToken $ TOperator s}
+ <0, interp> "!="                    {\s -> makeToken $ TOperator s}
  <0, interp> "->"                    {\s -> makeToken $ TSend}
  <0, interp> "<-"                    {\s -> makeToken $ TSuper}
  <0, interp> ^@ident\:$              {\s -> makeToken $ TLabel s}
