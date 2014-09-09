@@ -155,6 +155,9 @@ star   = let tok t@Token {token = (TOperator "*")} = Just t
 rocket = let tok t@Token {token = (TOperator "=>")} = Just t
              tok _ = Nothing
           in tokenP tok  <?> "'=>' (Hash Rocket)"
+hashAtom = let tok Token {token = (THashAtom s)} = Just $ EAtom s
+               tok _ = Nothing
+            in tokenP tok  <?> "hash symbol (eg foo:)"
 
 -- | If the next token is a block, treat it as Sapphire code and parse it
 --   returning a 'Block' expression.
@@ -291,9 +294,14 @@ hashLiteral :: TParser Exp
 hashLiteral = fmap EHash $ between copen cclose $ sepBy hash comma
   where
     hash :: TParser (Exp,Exp)
-    hash = do
+    hash = withAtom <|> withRocket
+    withRocket = do
       key <- safeExpr -- we may need to relax these requirments
       rocket
+      value <- safeExpr
+      return (key,value)
+    withAtom = do
+      key <- hashAtom
       value <- safeExpr
       return (key,value)
 

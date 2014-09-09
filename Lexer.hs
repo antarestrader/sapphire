@@ -8,14 +8,16 @@ import Text.Printf
 import Data.Char
 import Data.Word
 
+-- | The state of the lexer to be held in the Lexer monad
 data LexState = L
-  { mode::[Int]
-  , input :: AlexInput
-  , lsLine :: LineNo
-  , lsFile :: FilePath
-  , _buffer :: String -> String
+  { mode::[Int]  -- ^ mode for tokenizer
+  , input :: AlexInput  -- ^ the buffer of text to be scanned
+  , lsLine :: LineNo  -- ^ the line number being scanned
+  , lsFile :: FilePath  -- ^ the file being scanned
+  , _buffer :: String -> String -- ^ a buffer used to build up strings
   }
 
+-- | the Lexer monad
 type Lexer = ErrorT String (State LexState)
 
 runLexer :: LexState -> Lexer a -> Either String a
@@ -23,6 +25,11 @@ runLexer s m = evalState (runErrorT m) s
 
 putInput :: AlexInput -> Lexer ()
 putInput t = modify (\s -> s{input = t})
+
+pushChar :: Char -> Lexer ()
+pushChar c = modify (\state -> state{input = modInput (input state)})
+    where
+      modInput (o,l,bs,s) = (o,l,bs,c:s)
 
 pushMode :: Int -> Lexer ()
 pushMode m = modify (\s@L{mode=ms} -> s{mode = (m:ms)})
@@ -33,10 +40,12 @@ popMode = modify pop
     pop s@L{mode=([_])}  = s{mode = [0]}
     pop s@L{mode=(m:ms)} = s{mode = (ms)}
 
-type AlexInput = ( Offset
-                 , Char
-                 , [Byte]
-                 , String )
+
+
+type AlexInput = ( Offset -- ^ from front of line
+                 , Char   -- ^ previous char
+                 , [Byte] -- ^ Unicod multibyte buffer
+                 , String )  -- ^ remaining input
 
 alexOffset :: AlexInput -> Offset
 alexOffset (o,_,_,_) = o

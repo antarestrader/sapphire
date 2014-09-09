@@ -44,14 +44,18 @@ tokens :-
  <0, interp> "!="                    {\s -> makeToken $ TOperator s}
  <0, interp> "->"                    {\s -> makeToken $ TSend}
  <0, interp> "<-"                    {\s -> makeToken $ TSuper}
- <0, interp> ^@ident\:$              {\s -> makeToken $ TLabel s}
- <0, interp> ^@ident\:[^\:]          {\s -> makeToken $ TLabel s}
- <0, interp> \:@ident\:$             {\s -> makeToken $ TLabel $ tail s}
+ <0, interp> ^@ident\:$              {\s -> makeToken $ TLabel $ init s}
+ <0, interp> ^@ident\:[^\:]          {\s -> do
+                                              pushChar (last s)
+                                              makeToken $ TLabel $ init (init s)
+                                     }
+ <0, interp> @ident\:/~\:            {\s -> makeToken $ THashAtom $ init s}
+ <0, interp> \:@ident\:$             {\s -> makeToken $ TLabel $ tail (init s)}
  <0, interp> \@@ident                {\s -> makeToken $ TIVar  $ tail s}
- <0, interp> \:@ident\:/~\:          {\s -> makeToken $ TLabel $ tail s}
+ <0, interp> \:@ident\:/~\:          {\s -> makeToken $ TLabel $ tail (init s)}
  <0, interp> \:@ident                {\s -> makeToken $ TAtom  $ tail s}
  <0, interp> $digit+\.$digit+([eE][\+\-]?$digit+)?  {\s -> makeToken $ TFloat (read s)}
- <0, interp> $digit+                 {\s -> makeToken $ TInt (read s)}
+ <0, interp> $digit+          {\s -> makeToken $ TInt (read s)}
  <0, interp> @ident                  {\s -> makeToken $ TVar s}
  <0, interp> \(                      {\s -> makeToken $ TOpen}
  <0, interp> \)                      {\s -> makeToken $ TClose}
@@ -69,7 +73,7 @@ tokens :-
  <sqString> \\                       {\_ -> appendBuffer "\\" >> skip}
  <sqString, dqString> \n             {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
  <sqString> \'                       {\_ -> do { popMode; s <- buffer; clearBuffer; (makeToken $ TString s)}}
- <0,interp> \"                              {\_ -> pushMode dqString >> skip}
+ <0,interp> \"                       {\_ -> pushMode dqString >> skip}
  <dqString> [^ \\ \" \n \#]+         {\s -> appendBuffer s >> skip }
  <dqString> \"                       {\_ -> do { popMode; s <- buffer; clearBuffer; (makeToken $ TString s)}}
  <dqString> \\ \"                    {\_ -> appendBuffer "\"" >> skip}
