@@ -9,10 +9,12 @@ import Object.Spawn
 import Context
 import String
 import Var
+import Parser(parseString)
 
 import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.IO.Class
+import Control.Monad.Error
 
 objectClass = spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
@@ -29,9 +31,9 @@ bootstrapset = M.fromList [
        , ("puts", VFunction puts (0,Nothing))
        , ("to_s", VFunction to_s (0,Just 0)) 
        , ("cls" , VFunction cls  (0, Just 0))
-       -- , ("setCVar" , VFunction setCVar  (2, Just 2))
        , ("__initialize", VFunction initialize (0, Just 0))
        , ("debug", VFunction debug (0,Just 0))
+       , ("eval", VFunction evalStr (1,Just 1))
        ]
 
 debug _ = do
@@ -66,3 +68,12 @@ setClass [VObject cls] = do
   slf <- gets self
   modify (\c -> c{self=slf{klass=cls}})
   replyM_ VNil
+
+evalStr :: [Value] -> EvalM()
+evalStr [] = replyM_ VNil
+evalStr vs = do
+  let [Just str,filename,lineno,binding] = take 4 $ map Just vs ++ repeat Nothing
+  str' <- toString str
+  case parseString str' of -- fixme
+    Left p   -> throwError p
+    Right es -> replyM_ =<< (fmap last $ mapM eval es)

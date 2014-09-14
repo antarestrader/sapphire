@@ -3,6 +3,7 @@ module Builtin.Utils where
 import qualified Data.Map as M
 import Control.Monad.IO.Class
 import Control.Monad.State (gets)
+import Control.Monad.Error
 import {-# SOURCE #-} Eval
 import Object
 import AST
@@ -10,6 +11,7 @@ import Context (self, replyM_)
 import Object.Graph (lookupIVar, MutableValue(..))
 import {-# SOURCE #-} Object.Spawn (spawn)
 import Var (simple)
+import String
 
 innerValue :: EvalM Value
 innerValue = do
@@ -53,3 +55,13 @@ call target msg args = eval $ Call (EValue target) msg args'
 callT :: Value -> String -> [Value] -> EvalM ()
 callT target msg args = evalT $ Call (EValue target) msg args'
   where args' = map EValue args
+
+
+toString :: Value -> EvalM String
+toString val = loop val 12
+  where
+    loop (VString str) _ = return $ string str
+    loop _ 0 = throwError $ (show val) ++ " refuses to be converted to a String"
+    loop val' n = do
+      val'' <- eval (Call (EValue val') "to_s" [])
+      loop val'' (n-1)
