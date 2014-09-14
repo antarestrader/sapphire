@@ -1,6 +1,7 @@
 Tokens.hs
 Main
 dist/
+tmp/
 *.o
 *.o-boot
 *.hi-boot

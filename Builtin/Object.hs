@@ -14,13 +14,14 @@ import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.IO.Class
 
-objectClass = spawn $ VObject Class{
+objectClass = spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
         klass = ROOT,
         modules = [],
 	process = Nothing,
         super = ROOT,
         cvars = bootstrapset,
+        cmodules = [],
         properName = "Object"}
 
 bootstrapset = M.fromList [

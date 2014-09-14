@@ -42,10 +42,10 @@ popMode = modify pop
 
 
 
-type AlexInput = ( Offset -- ^ from front of line
-                 , Char   -- ^ previous char
-                 , [Byte] -- ^ Unicod multibyte buffer
-                 , String )  -- ^ remaining input
+type AlexInput = ( Offset --  from front of line
+                 , Char   --  previous char
+                 , [Byte] --  Unicod multibyte buffer
+                 , String )  --  remaining input
 
 alexOffset :: AlexInput -> Offset
 alexOffset (o,_,_,_) = o

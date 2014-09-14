@@ -84,10 +84,12 @@ eval (EAtom a) = return (VAtom a)
 eval (EString s) = return $ VString $ mkStringLiteral s
 
 eval (EIVar s) = do
-  val <- gets self >>= lookupIVarsM s 
-  return $ maybe VNil id val
+  (MV _ val) <- lookupIVar s 
+  return val
 
-eval (EVar var) = lookupVar var
+eval (EVar var) = do
+  (MV _ val) <- lookupVar var
+  return val
 
 eval (OpStr a ops) = do
   c <- get
@@ -99,18 +101,18 @@ eval (Assign lhs exp) = do
   return val
 
 eval (Call expr msg args) = do
-  (val,f) <- evalWithContext expr
+  (MV f val) <- evalWithContext expr
   r <-  valToObj val
   vals <- mapM eval args
   case r of 
-    Pid pid -> dispatchM pid (Execute (simple msg) vals)
+    Pid pid -> (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
       (result, obj') <- with receiver $ do
         (method, arity) <- fnFromVar (simple msg)
         guardR  "Wrong number of arguments." $ checkArity arity $ length vals
         extract $ method vals -- proper tail calls here
       f $ VObject obj' -- update self
-      return result
+      return $ responseToValue result
 
 eval (Index expr arg) = do
   val <- eval expr
@@ -123,7 +125,7 @@ eval (Apply var args) = do
   (fn, arity) <- fnFromVar var
   guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
-  extract $ fn vals -- extract impliments proper tail recursion
+  (fmap responseToValue) $ extract $ fn vals -- extract impliments proper tail recursion
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
@@ -131,7 +133,7 @@ eval (ApplyFn fnExp args) = do
     VFunction fn' arity -> do
        guardR "Wrong number of arguments." $ checkArity arity $ length args
        vals <- mapM eval args
-       extract $ fn' vals
+       (fmap responseToValue) $ extract $ fn' vals
     obj -> eval (Call (EValue obj) "call" args)
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
@@ -184,17 +186,12 @@ eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ sho
 --   second return value is a function that will replace the value of the evaluated
 --   object with the given value.
 
-evalWithContext :: Exp -> EvalM (Value, Value ->EvalM ())
-evalWithContext (EIVar str) = do
-  val <- gets self >>= lookupIVarsM str
-  case val of
-    Nothing -> return (VNil, (\_-> return ()))
-    Just v -> return (v, (\val -> modifySelf $ insertIVarLocal str val))
-evalWithContext (EVar var) = lookupVarContext var
+evalWithContext :: Exp -> EvalM (MutableValue)
+evalWithContext (EIVar str) = lookupIVar str
+evalWithContext (EVar var) = lookupVar var
 -- TODO: evalWithContext (Call exp str args)
-evalWithContext exp = do --by default we do not modify the context
-  val <- eval exp
-  return (val, \_ -> return ())
+evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
+   
 
 -- | Eval with tail calls
 --   Like @eval@ but places the result in the the response of the continuation
@@ -236,7 +233,7 @@ evalT exp = eval exp >>= replyM_  -- General case
 -- can pretend to be a function.
 fnFromVar :: Var -> EvalM (Fn, Arity)
 fnFromVar var = do
-  val <- lookupVar var
+  MV _ val <- lookupVar var
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
     (VError _) -> throwError $ "Function or Method not found: " ++ show var
@@ -255,14 +252,14 @@ fnFromVar var = do
 buildClass n super exp = do
   VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
   VObject clsClass <- eval (EVar $ simple "Class")
-  let cls = 
-        VObject Class 
+  let cls = Class 
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
 	  , process = Nothing
 	  , super = superClass
 	  , cvars = M.empty
+          , cmodules = []
 	  , properName = name n
 	  }
   Pid pid <- liftIO $ spawn cls

@@ -84,14 +84,14 @@ indexed [tk] = do
         VFunction{} -> do
           tv <- eval (ApplyFn (EValue d) [EValue tk])
           replyM_ tv
-          insertIVarM "__value" $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
+          updateInnerValue $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
         _ -> replyM_ d  
 
 indexAssign :: [Value] -> EvalM ()
 indexAssign [tk,tv] = do
   (VHash (hash@Hash{h=hashmap})) <- innerValue
   k <- valueToHKeyM tk
-  insertIVarM "__value" $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
+  updateInnerValue $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
   replyM_ =<< fmap VObject (gets self)
 
 -- | non-destructive assignment

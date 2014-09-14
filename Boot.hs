@@ -20,9 +20,10 @@ boot :: IO Object
 boot = do
   object <- objectClass
   let (Pid obj_pid) = object 
-  cls <- classClass object
+  cls@(Pid cls_pid) <- classClass object
   cont <- newContIO
   send cont obj_pid (Execute (simple "setClass") [VObject cls])
+  send cont cls_pid (Execute (simple "setClass") [VObject cls])
   send cont obj_pid (Execute (simple "setCVar")  [VAtom "Object", VObject object])
   send cont obj_pid (Execute (simple "setCVar")  [VAtom "Class", VObject cls]) 
 

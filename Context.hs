@@ -28,6 +28,7 @@ module Context
   , newContextIO
   , lookupLocals
   , insertLocals
+  , insertLocalM
   , merge
   , hasReply, canReply
   , extract
@@ -77,7 +78,7 @@ newContextIO obj resp = do
 dispatchC :: Context -- ^ the current Context
           -> Process -- ^ the process to send the message to
           -> Message -- ^ The message to be sent
-          -> IO (Value, Context) -- ^ the responce to the message, the updated context
+          -> IO (Response, Context) -- ^ the responce to the message, the updated context
 dispatchC c pid msg= do
   (val, self') <- dispatch (self c) (responder c) (continuation c) pid msg
   return (val, c{self=self'})
@@ -85,11 +86,11 @@ dispatchC c pid msg= do
 -- | Like dispatchC above, but ignores any changes made to the object itself.
 --   This is primarly used by search functions who can ensure that they are
 --   read-only all the way down the line.
-dispatchC_ :: Context -> Process -> Message -> IO Value
+dispatchC_ :: Context -> Process -> Message -> IO Response
 dispatchC_ c p m = fst `fmap` dispatchC c p m
 
 -- | Send a message to a process and block until it responds.
-dispatchM :: (MonadState Context m, MonadIO m) => Process -> Message -> m Value
+dispatchM :: (MonadState Context m, MonadIO m) => Process -> Message -> m Response
 dispatchM pid msg= do
   context <- get
   (val,context') <- liftIO $ dispatchC context pid msg
@@ -122,7 +123,7 @@ tailM pid msg = do
 replyM ::  (MonadState Context m, MonadIO m) => Value -> m Bool
 replyM val = do
   cont <- gets continuation
-  liftIO $ reply cont val
+  liftIO $ reply cont (Response val)
 
 -- | Send a response to the calling process like replyM, but with a unit return.
 replyM_ val = replyM val >> return ()
@@ -142,7 +143,7 @@ canReply = not `fmap` hasReply
 --
 -- Note to self: looking at this code later I'm not sure it is all completely thought through
 -- if there is a deadlock bug, look here.
-extract :: (MonadState Context m, MonadIO m) => m () -> m Value
+extract :: (MonadState Context m, MonadIO m) => m () -> m Response
 extract act = do 
   cOld@Context{continuation = cont} <- get
   r <- liftIO newEmptyTMVarIO
@@ -151,7 +152,7 @@ extract act = do
   modify (\ctx -> ctx{continuation = cont}) -- return the old continuation
   liftIO $ atomically $ readTMVar r
 
--- | Evaluate a method with the given object as self.  Returns bother the result
+-- | Evaluate a method with the given object as self.  Returns both the result
 --   and a potentially modified version of the object.
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
@@ -173,6 +174,9 @@ lookupLocals s Context{locals = l} = M.lookup s l
 insertLocals :: String -> Value -> Context -> Context
 insertLocals s val c@Context {locals=l} =
   c{locals = M.insert s val l}
+
+insertLocalM :: (MonadState Context m)=> String->Value-> m()
+insertLocalM str val = modify $ insertLocals str val
 
 -- | when applying a function, add the actual parameters to the local context
 --   by modifying the existing context. Parameters are passed as a list of name

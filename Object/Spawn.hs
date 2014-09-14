@@ -21,44 +21,49 @@ import Control.Concurrent.STM
 import Data.Maybe
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
--- | convert a value into a non-local object (aka a PID)
-spawn :: Value -> IO Object
-spawn (VObject obj@(Pid {})) = return obj
-spawn (VObject obj) | isJust (process obj) = return $ Pid $ fromJust $ process obj
-spawn (VObject obj) = do
+-- | convert a object into a non-local object (aka a PID)
+spawn :: Object -> IO Object
+spawn obj@(Pid {}) = return obj
+spawn obj | isJust (process obj) = return $ Pid $ fromJust $ process obj
+spawn obj = do
   process_id <- C.respondWith obj responderObject
   C.unsafeSend process_id (Initialize process_id)
   return $ Pid process_id
-spawn val = do
-  process_id <- C.respondWith val responderPrim
-  return $ Pid process_id
 
-responderPrim :: C.Responder Value Message Value
-responderPrim val msg = do  --TODO actually do something here
-  C.reply (snd msg) $ val
-  return val
-
--- | This is the function responcible for dealing with incomming messages
-responderObject :: C.Responder Object Message Value
+-- | This is the function responsible for dealing with incomming messages
+responderObject :: C.Responder Object Message Response
 responderObject obj msg =
   case fst msg of
     Eval        exp -> evaluate exp obj (snd msg)
-    SearchIVars str -> do
-      case (lookupIVarsLocal str obj) of
-        Nothing -> C.reply (snd msg) (VError "not found") >> return obj
-        Just v  -> C.reply (snd msg) v >> return obj
-    SearchCVars str -> do
-      case (lookupCVarsLocal str obj) of
-        Just v  -> C.reply (snd msg) v >> return obj
-	Nothing -> case (super obj) of 
-	  ROOT -> C.reply (snd msg) (VError "Not Found") >> return obj
-	  (Pid process) -> C.tail (snd msg) process (SearchCVars str) >> return obj
-    SetIVar str val -> C.reply (snd msg) val >> (return $ insertIVarLocal str val obj)
-    SetCVar str val -> C.reply (snd msg) val >> (return $ insertCVarLocal str val obj)
+    Search IVars str -> do
+      case (directIVars str obj) of
+        Nothing -> C.reply (snd msg) NothingFound >> return obj
+        Just v  -> C.reply (snd msg) (Response v) >> return obj
+    Search CVars str -> do
+      case (directCVars str obj) of
+        Just v  -> C.reply (snd msg) (Response v) >> return obj
+	Nothing -> C.reply (snd msg) NothingFound >> return obj
+    Search ObjectGraph str -> do
+      r <-  run obj (snd msg) (const Nothing) (searchObject str (MO undefined obj)) 
+      case r of
+        Just (MV _ v)  -> C.reply (snd msg) (Response v) >> return obj
+        Nothing ->  C.reply (snd msg) NothingFound >> return obj
+    Search ClassGraph str -> do
+      r <- run obj (snd msg) (const Nothing) (searchClass str obj) 
+      case r of
+        Just v  -> C.reply (snd msg) (Response v) >> return obj
+        Nothing ->  C.reply (snd msg) NothingFound >> return obj     
+    SetIVar str val -> C.reply (snd msg) (Response val) >> (return $ insertIVars str val obj)
+    SetCVar str val -> C.reply (snd msg) (Response val) >> (return $ insertCVars str val obj)
+    PushModule val@(VObject obj)  -> 
+          C.reply (snd msg) (Response val) >> (return $ obj{modules = (obj:(modules obj))})
+    PushCModule val@(VObject obj) -> case obj of
+      Class{cmodules = c} -> C.reply (snd msg) (Response val) >> (return $ obj{cmodules = (obj:c)})
+      _ -> C.reply (snd msg) (Error "Object is not a class") >>  (return $ obj)
     Execute     var args  -> call obj var args (snd msg)
     Initialize  pid -> do
       obj' <- initialize pid obj
-      C.reply (snd msg) $ VObject $ Pid pid
+      C.reply (snd msg) $ Response $ VObject $ Pid pid
       return obj'
 
 initialize :: Process -> Object -> IO Object
@@ -71,13 +76,24 @@ evaluate exp obj cont = do
   let context = newContext obj cont responderObject
   result <- runEvalM (eval exp) context
   case result of 
-    Left  err -> C.reply cont (VError err) >> return obj
-    Right (val,context) -> C.reply cont val >> return (self context)  -- not proper tail call
+    Left  err -> C.reply cont (Response $ VError err) >> return obj
+    Right (val,context) -> C.reply cont (Response val) >> return (self context)  -- not proper tail call
+
+-- WARNING: this function looses mutiations to oBject if that is important
+-- use evaluate instead.
+run :: Object -> Continuation -> (String -> a) -> EvalM a -> IO a
+run obj cont fixerror action = do
+  let context = newContext obj cont responderObject
+  result <- runEvalM action context
+  case result of 
+    Left err -> return $ fixerror err
+    Right (a,_) -> return a 
+
 
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   let context =  newContext obj cont responderObject
   result <- runEvalM (evalT $ Apply var $ map EValue args) context  
   case result of
-    Left  err -> (C.reply cont (VError err)) >> return obj
+    Left  err -> (C.reply cont (Response $ VError err)) >> return obj
     Right ((),context) -> return (self context) 

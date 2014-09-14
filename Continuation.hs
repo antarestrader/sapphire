@@ -108,8 +108,8 @@ tail cont pid msg = do
 -- | send a message and wait for the response 
 dispatch :: a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO (r, a)
 dispatch obj responder cont pid msg = do
-  let dispatchQueue =  shadowChannel pid cont -- where to send the message
   (cont', responseQueue) <- shadow cont -- set up a shadowed reciever
+  let dispatchQueue =  shadowChannel pid cont' -- where to send the message
   writeQueue dispatchQueue (msg, cont') -- send the message
   loop (replier cont') responseQueue obj
     where

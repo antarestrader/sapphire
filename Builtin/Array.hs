@@ -9,15 +9,10 @@ import qualified Array as A
 import Array (Array,(|>),(><),(<|))
 import qualified Data.Map as M
 import Object
-import Object.Graph (lookupIVarsM)
-import Object.Spawn (spawn)
 import Eval
 import AST
 import Builtin.Utils
-import Var (simple)
-import Context (self, replyM_)
-import Control.Monad.State (gets)
-import Control.Monad.IO.Class
+import Context (replyM_)
 import Data.Foldable
 
 
