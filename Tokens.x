@@ -71,7 +71,7 @@ tokens :-
  <sqString> \\ \'                    {\_ -> appendBuffer "'" >> skip}
  <sqString> \\ \\                    {\_ -> appendBuffer "\\" >> skip}
  <sqString> \\                       {\_ -> appendBuffer "\\" >> skip}
- <sqString, dqString> \n             {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"} 
+ <sqString, dqString> \n             {\_ -> throwError "Missing closing quotation mark (').  End of Line found instead"}
  <sqString> \'                       {\_ -> do { popMode; s <- buffer; clearBuffer; (makeToken $ TString s)}}
  <0,interp> \"                       {\_ -> pushMode dqString >> skip}
  <dqString> [^ \\ \" \n \#]+         {\s -> appendBuffer s >> skip }
@@ -113,7 +113,7 @@ scanTokens fp l m = runLexer init loop
           ts <- act (matched t i)
           tss <- loop
           return (ts ++ tss)
-    
+
     matched :: AlexInput -> Int -> String
     matched (_,_,_,s) l = take l s
 

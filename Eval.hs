@@ -61,12 +61,12 @@ type Err = String
 type EvalM a= StateT Context (ErrorT Err IO) a
 
 -- | execute the EvalM action using the provided Context.
-runEvalM :: (EvalM a) -- ^ the action to be run 
+runEvalM :: (EvalM a) -- ^ the action to be run
          -> Context   -- ^ the context to run it in
          -> IO (Either Err (a, Context))
 runEvalM e c = do
   r <- try $ runErrorT $ runStateT e c
-  case r of 
+  case r of
     Right x -> return x
     Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
 
@@ -84,7 +84,7 @@ eval (EAtom a) = return (VAtom a)
 eval (EString s) = return $ VString $ mkStringLiteral s
 
 eval (EIVar s) = do
-  (MV _ val) <- lookupIVar s 
+  (MV _ val) <- lookupIVar s
   return val
 
 eval (EVar var) = do
@@ -104,7 +104,7 @@ eval (Call expr msg args) = do
   (MV f val) <- evalWithContext expr
   r <-  valToObj val
   vals <- mapM eval args
-  case r of 
+  case r of
     Pid pid -> (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
       (result, obj') <- with receiver $ do
@@ -147,7 +147,7 @@ eval (If pred cons alt) = do
 
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
-  case cls of 
+  case cls of
     VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
     _ -> buildClass n super exp
 
@@ -191,11 +191,11 @@ evalWithContext (EIVar str) = lookupIVar str
 evalWithContext (EVar var) = lookupVar var
 -- TODO: evalWithContext (Call exp str args)
 evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
-   
+
 
 -- | Eval with tail calls
 --   Like @eval@ but places the result in the the response of the continuation
---   rather then return them as the result.  This allows for proper tail 
+--   rather then return them as the result.  This allows for proper tail
 --   recursion.  Most cases are handled by calling back to eval, but those
 --   that are suseptable to tail recursion are reimplimented here.
 evalT ::  Exp -> EvalM ()
@@ -208,14 +208,14 @@ evalT (Call  expr msg args) = do
   val <- eval expr
   r <- valToObj val
   vals <- mapM eval args
-  case r of 
+  case r of
     Pid pid -> tailM pid (Execute (simple msg) vals)
-    receiver -> fmap fst $ with receiver $ do 
+    receiver -> fmap fst $ with receiver $ do
       (method, arity) <- fnFromVar (simple msg)
       guardR "Wrong number of arguments." $ checkArity arity $ length vals
       method vals
     -- TODO put self back (see issue #28 on github)
-evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exps) 
+evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exps)
 evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
@@ -244,7 +244,7 @@ fnFromVar var = do
 --
 -- If a super class is not given we assume Object by default; every class is an
 -- instance of Classs. The class structure is built and a new class is spawned.
--- Becase classes are by defination shared information among all their 
+-- Becase classes are by defination shared information among all their
 -- instances, every class must have its own process.
 --
 -- All classes are registered by their proper name in Object or the containing
@@ -252,7 +252,7 @@ fnFromVar var = do
 buildClass n super exp = do
   VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
   VObject clsClass <- eval (EVar $ simple "Class")
-  let cls = Class 
+  let cls = Class
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
@@ -287,7 +287,7 @@ mkFunct params exp vals = do
       ps' <- assignParams ps []
       return $ (str, val):ps'
     assignParams [VarArg str] vs = return $ [(str,VArray(A.fromList vs))]
-    assignParams (p:ps) (v:vs) = assignParams ps vs >>= (\ps'-> return $ (getParamName p, v):ps') 
+    assignParams (p:ps) (v:vs) = assignParams ps vs >>= (\ps'-> return $ (getParamName p, v):ps')
 
 -- | Part of the process of applying a function is to set the formal parameters
 --   equal to the actual parameters.  Once accomplished, a new context is

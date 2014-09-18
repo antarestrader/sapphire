@@ -6,7 +6,7 @@ instance Show Var where
   show Self = "self"
   show Var {name = n, scope = []} = '"':n++'"':[]
   show Var {name = n, scope = xs} = scopeToString "" xs ++ n
-    where 
+    where
       scopeToString str [] = str
       scopeToString str (x:xs) = scopeToString (str++x++"::") xs
 

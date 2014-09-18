@@ -13,7 +13,7 @@
 --   qualification but by making it generic, we ensure easy modifactions to both
 --   structures.
 
-module Context 
+module Context
   ( Context( self )
   , modifySelf
   , dispatchC
@@ -48,7 +48,7 @@ import Continuation hiding (Responder, Message, Continuation, Replier)
 -- | This structure contains the state of a sapphire evaluation.  It is
 --   generally assumed that this structure will live in a state monad. In order
 --   to enforce a clean interface, only the self field is exposed.
-data Context = Context 
+data Context = Context
                { locals :: M.Map String Value
                , self :: Object  -- ^ The object itself
                , continuation :: Continuation
@@ -69,9 +69,9 @@ newContextIO obj resp = do
 -- | Send a process a message and wait for the reply. It is possible that the
 --   recieving process will wish to send a message back to the sender (either
 --   directly or indirectly) to prevent deadlocks, it must be possible to
---   respond to down stream messages while waiting for the response. This in 
+--   respond to down stream messages while waiting for the response. This in
 --   turn implies that `self` may be modified by such a message in which case
---   the expectation is that the sending process will continue with the 
+--   the expectation is that the sending process will continue with the
 --   modified version.  This function therefore requires the current context,
 --   and returns a possibilly modified version of that context along with the
 --   response value.
@@ -115,7 +115,7 @@ tailM pid msg = do
   cont <- gets continuation
   liftIO $ tail cont pid msg
 
--- TODO modifySelf, modifySelfM 
+-- TODO modifySelf, modifySelfM
 
 -- | Send a response to the calling process if no response has yet been given.
 --   Returns true if the response was sent, false if a previous value had been
@@ -137,14 +137,14 @@ hasReply = gets continuation >>= liftIO . isEmpty
 canReply :: (MonadState Context m, MonadIO m, Functor m) => m Bool
 canReply = not `fmap` hasReply
 
--- | Given an action that sets a reply value, run that action capturing the 
+-- | Given an action that sets a reply value, run that action capturing the
 --   reply value.  This replaces the replier with a temporary one so the reply
 --   is not propigated to the outside context.
 --
 -- Note to self: looking at this code later I'm not sure it is all completely thought through
 -- if there is a deadlock bug, look here.
 extract :: (MonadState Context m, MonadIO m) => m () -> m Response
-extract act = do 
+extract act = do
   cOld@Context{continuation = cont} <- get
   r <- liftIO newEmptyTMVarIO
   modify (\ctx -> ctx{continuation = cont{replier = r}})
@@ -157,7 +157,7 @@ extract act = do
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
   self' <- gets self
-  modifySelf $ const obj 
+  modifySelf $ const obj
   a <- f
   obj' <- gets self
   modifySelf $ const self'
@@ -182,8 +182,8 @@ insertLocalM str val = modify $ insertLocals str val
 --   by modifying the existing context. Parameters are passed as a list of name
 --   value pairs.
 merge :: [(String,Value)] -> Context -> Context
-merge params  c@Context {locals=l} = 
-  c{locals = M.union (M.fromList params) l} 
+merge params  c@Context {locals=l} =
+  c{locals = M.union (M.fromList params) l}
 
-debugM :: (MonadState Context m) => m (M.Map String Value) 
+debugM :: (MonadState Context m) => m (M.Map String Value)
 debugM = gets locals

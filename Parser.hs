@@ -14,7 +14,7 @@
 
 -- In addation to the parsers there are some functions that facilitate
 -- parsing of lines, files and input strings
-   
+
 module Parser (
     -- * Invoking a Parser
 
@@ -22,7 +22,7 @@ module Parser (
     runParser'
   , parseString
   , parseFile
-    -- * Elementry 
+    -- * Elementry
 
     -- | Parsers that identify control tokens, that is tokens without
     --   content.
@@ -140,7 +140,7 @@ tsend  = tokenEq TSend         <?> "'->' (Send)"
 assignP= tokenEq TAssign       <?> "'=' (Assignment Operator)"
 nil    = keyword "nil"   >> return ENil
 falseP = keyword "false" >> return EFalse
-trueP  = keyword "true"  >> return ETrue 
+trueP  = keyword "true"  >> return ETrue
 selfP  = keyword "self"  >> return Self <?> "self"
 tend   = tokenEq TEnd >> return () <?> "End of Line"
 tsuper = tokenEq TSuper         <?> "<-"
@@ -165,10 +165,10 @@ block :: TParser Exp
 block  = do
   blk <- tblock
   let file = filename $ blk
-  let result = do 
+  let result = do
         tokens <- scanBlock blk
-        runParser' exprs False file tokens 
-  case result of 
+        runParser' exprs False file tokens
+  case result of
     Left p -> parserFail p  -- check here for problems with large nested error messages
     Right exps ->  return $ Block exps
 
@@ -181,7 +181,7 @@ tblock = do {b <- tokenP tok; putState True; return b} -- True in state inhibits
     tok _ = Nothing
 
 foldP :: Stream s m t => a -> (a -> ParsecT s u m a) -> ParsecT s u m a
-foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)   
+foldP x f = (f x >>= \x' -> foldP x' f) <|> (return x)
 
 andor :: Stream s m t => (e -> ParsecT s u m e) -> (e -> ParsecT s u m e) -> e -> ParsecT s u m e
 andor pa pb e0 = do
@@ -226,7 +226,7 @@ interp  = between tstartI tendI expr
 
 -- | An extended string consisting of TStrings and interp blocks
 exString :: TParser Exp
-exString = do 
+exString = do
     x <- string
     xs <- many (interp <|> string)
     if (null xs) then return x else return $ ExString (x:xs)
@@ -286,7 +286,7 @@ parameter = vararg <|> param
     hasDefault (Param str) = (assignP >> fmap (Default str) safeExpr) <|> (return $ Param str)
 
 arrayLiteral :: TParser Exp
-arrayLiteral = do 
+arrayLiteral = do
   xs <- between bopen bclose $ sepBy expr comma
   return $ EArray xs
 
@@ -320,11 +320,11 @@ stringT = tokenP tok
     tok _ = Nothing
 
 -- | An undecorated variable (@foo@) possibally scopped (@Foo::bar@)
---   
+--
 --   __Notice__: This parser does not stand on it own but relies on the special
 --   extending 'args' to produce an expression.
 var :: TParser Var
-var = do 
+var = do
     let pscope xs = do
           tokenEq TScope
           x <- identifier
@@ -362,7 +362,7 @@ op = do
     testTok Token{ token=(TOperator op)} = Just op
     testTok _ = Nothing
 
--- | An extended expression without the opStr option used within OpStr 
+-- | An extended expression without the opStr option used within OpStr
 exprForOpStr = statement <|> expr1a
   where
     expr1a = expr0 >>= extend
@@ -370,7 +370,7 @@ exprForOpStr = statement <|> expr1a
     extension' exp = assign exp <|> indexed exp <|> called exp <|> sent exp
 
 -- | An extension parser for assignment expressions
---   
+--
 --   Assignment is a little tricky because only certian forms can be
 --   assigned to.  There is no possible way to assign to a literal value.
 --   To accomplish this after finding an assignment operator, the parser
@@ -410,7 +410,7 @@ ifBlock = do
   let result = do
         tokens <- scanBlock blk
         runParser' ifBlock' False file tokens
-  case result of 
+  case result of
     Left p  -> parserFail p -- TODO Propagate error
     Right x -> return x
 
@@ -485,7 +485,7 @@ sent exp = do
   return $ Send exp s args
 
 -- | expressions which can safely be understood as the first argument in an unenclosed argument list
-safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString  
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString
 
 safeExpr = do
     exp <- safeExpr0
@@ -499,14 +499,14 @@ safeExpr = do
 
 -- | The union of all basic expressions
 expr0 :: TParser Exp
-expr0 = paren 
-     <|> nil <|> falseP      <|> trueP 
-     <|> (var >>= args True) <|> ivar  <|> atom   <|> float 
+expr0 = paren
+     <|> nil <|> falseP      <|> trueP
+     <|> (var >>= args True) <|> ivar  <|> atom   <|> float
      <|> int <|> exString    <|> arrayLiteral <|> hashLiteral <?> "basic expression unit"
 
 -- | The union of all extending parsers.  Given a base expression this
 --   parser will check the subsiquent token stream for extended forms such
---   as assignment, indexing, method calls or operator strings. 
+--   as assignment, indexing, method calls or operator strings.
 extension :: Exp -> TParser Exp
 extension exp = opStr exp <|> assign exp <|> indexed exp <|> called exp <|> sent exp <|> functionBlockExtend exp
 
@@ -547,7 +547,7 @@ tmeta = tokenP tok <?> "Comment/pragma"
 
 -- | A complete line of comment, potentially including a comment block.
 meta = do
-  tmeta  
+  tmeta
   (tend >> return ()) <|> (tblock >> return ())
 
 -- | Used to ignore comments.

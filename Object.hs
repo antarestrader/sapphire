@@ -47,7 +47,7 @@ instance Eq Value where
   VTrue == VTrue = True
   VFalse == VFalse = True
   _ == _ = False
-  
+
 instance Show Value where
   show (VInt i) = show i
   show (VFloat f) = show f
@@ -82,13 +82,13 @@ data Object = Pid Process
             | Object { ivars   :: M.Map String Value  -- ^ instance variables
                      , klass   :: Object   -- ^ the class of this instance
 		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
-		     , process :: Maybe Process  -- ^ must be a PID pointing to this object 
+		     , process :: Maybe Process  -- ^ must be a PID pointing to this object
 		     }
             | Class   {ivars   :: M.Map String Value  -- ^ instance variables
 	             , klass   :: Object   -- ^ the class of this instance (typicall Class)
 		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
 		     , process :: Maybe Process -- ^ must be a PID pointing to this object
-		     , super   :: Object   -- ^ the super-class of this class 
+		     , super   :: Object   -- ^ the super-class of this class
 		     , cvars :: M.Map String Value     -- ^ instance methods
 		     , cmodules :: [Object]            -- ^ included class modules
                      , properName :: String            -- ^ The name in the "global" scope of this class
@@ -103,7 +103,7 @@ data Message =
   | SetCVar String Value
   | PushModule Value
   | PushCModule Value
-  | Eval Exp 
+  | Eval Exp
   | Initialize Process -- ^ Set process to Pid and call initialization method
   | Terminate
 

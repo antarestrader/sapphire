@@ -2,7 +2,7 @@
 
 -- | TODO: add overall description
 
-module Continuation 
+module Continuation
   ( Message
   , MessageQueue
   , ProcessId
@@ -25,8 +25,8 @@ import Prelude hiding (tail)
 import Control.Monad.State
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar 
-import Control.Concurrent.STM.TChan 
+import Control.Concurrent.STM.TMVar
+import Control.Concurrent.STM.TChan
 
 -- | A messaged m with a place to sent a reply r
 type Message m r = (m, Continuation m r)
@@ -66,10 +66,10 @@ respondWith o r = do
         o' <- r o m
         loop queue o'  --TODO end loop
 
--- | The information needed to respond to a message. In order to avoid 
+-- | The information needed to respond to a message. In order to avoid
 --   deadlocks it must also be provided to any down stream messages
-data Continuation m r = 
-    Cont 
+data Continuation m r =
+    Cont
       {
 	replier   :: TMVar r
       , receivers :: ContList m r
@@ -89,8 +89,8 @@ send cont pid msg = do
   writeQueue queue (msg, cont')
   return $ R $ replier cont'
 
--- | send without checking for shadowing.  This can only be used when the 
---   programmer is sure that the process is not shadowed.  E.g. to add an 
+-- | send without checking for shadowing.  This can only be used when the
+--   programmer is sure that the process is not shadowed.  E.g. to add an
 --   initialization message to a brand new process.
 unsafeSend :: ProcessId m r -> m -> IO ()
 unsafeSend pid msg = do
@@ -105,7 +105,7 @@ tail cont pid msg = do
   writeQueue queue (msg, cont)
 
 
--- | send a message and wait for the response 
+-- | send a message and wait for the response
 dispatch :: a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO (r, a)
 dispatch obj responder cont pid msg = do
   (cont', responseQueue) <- shadow cont -- set up a shadowed reciever
@@ -115,7 +115,7 @@ dispatch obj responder cont pid msg = do
     where
       loop answer (Queue chan) obj = do
         r <- atomically ((readTChan chan >>= (return . Left)) `orElse` (readTMVar answer >>= (return . Right)))
-        case r of 
+        case r of
           Left m -> responder obj m >>= loop answer (Queue chan)
           Right r' -> return (r', obj)
 
@@ -141,7 +141,7 @@ shadow cont = do
   return (Cont{replier=rep, receivers = insertContList (tid,queue) (receivers cont)}, queue)
 
 shadowChannel :: ProcessId m r -> Continuation m r -> MessageQueue m r
-shadowChannel (tid, chan) cont = maybe chan id $ findChannel tid $ receivers cont 
+shadowChannel (tid, chan) cont = maybe chan id $ findChannel tid $ receivers cont
 
 findChannel :: ThreadId -> ContList m r-> Maybe (MessageQueue m r)
 findChannel = lookup

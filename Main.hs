@@ -23,7 +23,7 @@ main = do
   context <- newContextIO main responderObject
   interperter ["base/base.sap"] context
   -- interperter [""] context
- 
+
 repl :: Context -> IO ()
 repl c = do
   l <- prompt "Sapphire"
@@ -50,7 +50,7 @@ parserREPL c = do
            case result of
              Left  err -> putStrLn ("Error: " ++ err) >> parserREPL c
              Right exps -> do
-               mapM_ print exps 
+               mapM_ print exps
                parserREPL c
 
 tokenREPL :: Context -> IO ()
@@ -60,7 +60,7 @@ tokenREPL c = do
     "" -> system c
     _  -> do
            let toks = scanBlock $ parseCode "Input String" l
-           print toks 
+           print toks
            tokenREPL c
 
 data Command = Cmd{regex::String, help_text::String, fn :: ([String] -> Context -> IO())}
@@ -125,7 +125,7 @@ debugger [""] c = do
 debugger [obj] c = do
   flip runEvalM c $ do
     val <- eval (EVar $ simple obj)
-    case val of 
+    case val of
       VObject (Object{ivars = i}) -> do
         liftIO $ putStrLn $ show i
       VObject (Class{ivars = i, cvars = c}) -> liftIO $ do
@@ -155,7 +155,7 @@ cmdPrompt l = do
   Prelude.getLine
 
 getLines :: String -> IO String
-getLines ls = do 
+getLines ls = do
   l <- Prelude.getLine
   case l of
     "" -> return ls

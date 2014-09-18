@@ -2,11 +2,11 @@
 -- This file is part of Sapphire and Licensed under the GNU General Public
 -- Licnese, Version 3.  See LICENCE file for details
 
--- | A block is a list of lines at the same indentation level. A line is the 
+-- | A block is a list of lines at the same indentation level. A line is the
 --   text from the first non-space character to the end of the line plus the
 --   block of lines that follow immediately and are more indented then the line.
 --
---   The line parser is fast, brutish and dumb. Its world consists of spaces 
+--   The line parser is fast, brutish and dumb. Its world consists of spaces
 --   (U+0020) new lines (U+000a) and everything else. It produces blocks and
 --   lines. A block is a list of lines at the same level of indentation. A line
 --   is all characters between the first non-space character and a new line
@@ -47,13 +47,13 @@ type LineNo = Integer
 type Offset = Integer
 
 -- | This is a line of code as understood by the line parser (i.e. a text line
---   and all indented lines beneath as a block). A blank line has its own 
+--   and all indented lines beneath as a block). A blank line has its own
 --   constructor sense they do not effect block creation.
-data Line 
+data Line
     -- | A typical line.  In addation to the text this structure contains
     --   enough information to recreate the line and calculate appropriate
     --   offsets and line numbers when reporting errors.
-  = Line {   line :: String -- ^ The text of the line less leading spaces 
+  = Line {   line :: String -- ^ The text of the line less leading spaces
          , offset :: Offset -- ^ The number of leading spaces stripped
          , lineNo :: LineNo -- ^ Vertical offset of this line for error reporting
          ,  block :: (Maybe CodeBlock) -- ^ The indented block below this line
@@ -65,8 +65,8 @@ data Line
 
 -- | This is a block as understood by the line parser, a collection of lines
 --   in order and at the same level of indent.  (remember lines may contain
---   blocks of indented code beneath them.) 
-data CodeBlock = 
+--   blocks of indented code beneath them.)
+data CodeBlock =
   Block { lines :: [Line]      -- ^ The lines in this block
         , startLine:: LineNo   -- ^ The vertical offset of the first line
         , indent :: Offset     -- ^ The number os spaces that proceed every line in the block
@@ -75,7 +75,7 @@ data CodeBlock =
 
 instance Show Line where
   show (BlankLine i) = printf "%4d:\n" i
-  show l = printf "%4d: %*s%s\n%s" (lineNo l) (offset l) "" (line l) (maybe "" show (block l))  
+  show l = printf "%4d: %*s%s\n%s" (lineNo l) (offset l) "" (line l) (maybe "" show (block l))
 
 instance Show CodeBlock where
   show blk = printf "Block(start:%d, indent:%d, lines:%d, file:'%s')\n%s\n" (startLine blk) (indent blk) (length $ lines blk) (filename blk) (show $ lines blk)
@@ -91,7 +91,7 @@ unlineBlock b = concat $ map lineToString (lines b)
 lineToString :: Line -> String
 lineToString (BlankLine _) = "\n"
 lineToString l | (line l == "") =  (maybe "" unlineBlock (block l))
-lineToString l = (replicate (fromIntegral $ offset l) ' ') ++ (line l) ++ "\n" ++ (maybe "" unlineBlock (block l))  
+lineToString l = (replicate (fromIntegral $ offset l) ' ') ++ (line l) ++ "\n" ++ (maybe "" unlineBlock (block l))
 
 -- | parse a string into a CodeBlock
 parseCode :: FilePath -> String -> CodeBlock
@@ -103,16 +103,16 @@ parseCode file text =
 
 -- | Parse a file into a CodeBlock
 parseFile :: FilePath -> IO CodeBlock
-parseFile fp = (parseCode fp) `fmap` readFile fp 
+parseFile fp = (parseCode fp) `fmap` readFile fp
 
 
 -- Private functions and data below:
 
-data LParserState = LPS 
+data LParserState = LPS
   { fileName        :: FilePath
   , input'          :: [String] -- lines to be parsed
   , nextLine'       :: Maybe Line -- to allow a line to be put back into the input stack
-  , currentLineNum' :: LineNo 
+  , currentLineNum' :: LineNo
   }
 
 type LParser a = State LParserState a
@@ -138,7 +138,7 @@ ungetLine l = do
 compareLine :: Offset -> LParser (Maybe (Line,Ordering))
 compareLine i = do
   maybe_l <- getLine
-  case maybe_l of 
+  case maybe_l of
     Nothing -> return Nothing
     Just l@(BlankLine _) -> return $ Just (l,EQ)
     Just l -> return $ Just (l, compare (offset l) i )
@@ -146,7 +146,7 @@ compareLine i = do
 parseLines ::  LParser CodeBlock
 parseLines  = do
   l' <- getLine
-  case l' of 
+  case l' of
     Nothing -> error "parse lines called with nothing in buffer"
     Just l@(BlankLine _) -> parseLines >>= (return . prependLine l) -- ignore blank line
     Just l -> parseLines' (lineNo l) (offset l) [l]
@@ -161,12 +161,12 @@ parseLines' s i ls = do
       ungetLine l
       blk <- parseLines
       parseLines' s i (addBlockToHead blk ls) -- put this block into the most recent line.
-    Just (l,LT) -> ungetLine l >> mkBlock s i (reverse ls)  -- end of block founds 
+    Just (l,LT) -> ungetLine l >> mkBlock s i (reverse ls)  -- end of block founds
 
 mkBlock :: LineNo -> Offset -> [Line]  -> LParser CodeBlock
 mkBlock sl i ls = do
   fn <- gets fileName
-  return Block {lines = ls, startLine = sl, indent = i, filename = fn} 
+  return Block {lines = ls, startLine = sl, indent = i, filename = fn}
 
 addBlockToHead :: CodeBlock -> [Line] -> [Line]
 -- If the most recently pushed line is blank, it does not have a block field.
@@ -177,7 +177,7 @@ addBlockToHead blk (l@(BlankLine _):ls) = addBlockToHead (pushLine blk l) ls
 addBlockToHead blk (l:ls) = case (block l) of
   Nothing ->  let l' = l {block = Just blk} in (l':ls)
   Just existing -> -- There was already a block. (implies negitive indentation) Create a psudo Line containing no text
-                   -- but only the block as the first line of the outer block.  
+                   -- but only the block as the first line of the outer block.
     let l'   = Line { line = "", offset = indent blk, lineNo = startLine existing, block = Just existing}
 	blk' = prependLine l' blk
 	l''  = l { block = Just blk'}

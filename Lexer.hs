@@ -59,7 +59,7 @@ alexInputPrevChar (p,c,bs,s) = c
 alexGetByte :: AlexInput -> Maybe (Byte,AlexInput)
 alexGetByte (p,c,(b:bs),s) = Just (b,(p,c,bs,s))
 alexGetByte (p,c,[],[]) = Nothing
-alexGetByte (p,_,[],(c:s)) = 
+alexGetByte (p,_,[],(c:s)) =
   let p' = p + 1
       (b:bs) = utf8Encode c
   in p' `seq` Just (b, (p',c,bs,s))
@@ -84,9 +84,9 @@ appendBuffer str = modify (\s@L{_buffer=b} -> s{_buffer = b . (str ++)})
 
 -- | The core Token types.
 data T =
-  TKeyword String  | 
+  TKeyword String  |
   TFloat Double    |
-  TInt   Integer   | 
+  TInt   Integer   |
   TVar   String    |
   TIVar  String    |
   TOpen | TClose   |

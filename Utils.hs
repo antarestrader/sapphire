@@ -14,7 +14,7 @@ guardR msg False = throwError $ strMsg msg
 -- | Impliments the Shunting-yard Algorithm
 --   of Edsger Dijstra as described at
 --   http://www.wcipeg.com/wiki/Shunting_yard_algorithm
-shunt :: (M.Map Op Precedence) -- the operator presedence table 
+shunt :: (M.Map Op Precedence) -- the operator presedence table
       -> [Exp]                 -- the expression stack (preload with first expression)
       -> [(Op,Precedence)]     -- the operator stack (initially empty)
       -> [(Op,Exp)]            -- the input stack (initially the all op exp pairs)
@@ -27,15 +27,15 @@ shunt c (a:b:xs) ((op,p):ops) [] = shunt c ((makeOpExpr p b a op):xs) ops []
 shunt c (b:a:xs) ((oPopped,pa@(p,L,_)):opstack) ((op,z):ops) | (pb < p) =
   shunt c ((makeOpExpr pa a b oPopped):xs) opstack ((op,z):ops)
   where
-    (pb,_,_) = findOp c op 
+    (pb,_,_) = findOp c op
 -- For right- and non-associative Operator pop from the stack while operator is of lower or equal precedence
 shunt c (b:a:xs) ((oPopped,pa@(p,_,_)):opstack) ((op,z):ops) | (pb <= p) =
   shunt c ((makeOpExpr pa a b oPopped):xs) opstack ((op,z):ops)
   where
     (pb,_,_) = findOp c op
 -- When the operator stack is empty or the precedence is too high,
--- push the operator and next expression onto their stacks 
-shunt c xs ys ((op,x):ops) = 
+-- push the operator and next expression onto their stacks
+shunt c xs ys ((op,x):ops) =
   shunt c (x:xs) ((op,p):ys) ops
     where
       p = findOp c op
