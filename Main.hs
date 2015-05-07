@@ -2,6 +2,7 @@
 module Main where
 
 import System.Environment
+import System.Exit
 import System.IO
 import Control.Monad.Error
 import qualified Data.Map as M
@@ -21,9 +22,28 @@ import Text.Regex.Posix
 
 main :: IO ()
 main = do
+  run <- parseArgs
   putStrLn ("The Sapphire Interpreter built " ++__DATE__ ++ " " ++ __TIME__)
-  main <- boot
-  repl main
+  boot >>= run
+
+parseArgs :: IO (Context -> IO ())
+parseArgs = do
+  args <- getArgs
+  case args of
+    ["--version"] -> do
+      putStrLn "Sapphire Early Developmet Version.  Copyright 2013,2014,2015 John Miller"
+      exitSuccess
+    ("-i":files) -> return (\c -> runFiles c files >>= repl)
+    [file] -> return (\c -> runFiles c [file] >> return ())
+    _ -> return repl
+
+runFiles:: Context -> [String] -> IO Context
+runFiles c [] = return c
+runFiles c (file : files) = do
+  r' <- runEvalM (load file) c
+  case r' of
+    Left err -> hPutStr stderr err >> exitFailure
+    Right (_, c') -> runFiles c files
 
 repl :: Context -> IO ()
 repl c = do
