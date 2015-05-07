@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 
 import System.Environment
@@ -8,6 +9,7 @@ import LineParser (parseCode)
 import Tokens
 import Object
 import Object.Spawn (responderObject)
+import Builtin.Object (load)
 import AST
 import Parser
 import Eval
@@ -19,10 +21,9 @@ import Text.Regex.Posix
 
 main :: IO ()
 main = do
+  putStrLn ("The Sapphire Interpreter built " ++__DATE__ ++ " " ++ __TIME__)
   main <- boot
-  context <- newContextIO main responderObject
-  interperter ["base/base.sap"] context
-  -- interperter [""] context
+  repl main
 
 repl :: Context -> IO ()
 repl c = do
@@ -78,14 +79,10 @@ commands = [
 
 interperter [""] c = repl c
 interperter [file] c = do
-  r <- parseFile file
-  case r of
-    Left err -> putStrLn (show err)    >> system c
-    Right exps -> do
-      r' <- runEvalM (eval $ Block exps) c
-      case r' of
-        Left err -> putStrLn err >> system c
-        Right (res,c') -> putStrLn (show res) >> repl c'
+  r' <- runEvalM (load file) c
+  case r' of
+    Left err -> putStrLn err >> system c
+    Right (res,c') -> putStrLn (show res) >> repl c'
 
 parser [""] c = parserREPL c
 parser [file] c = do

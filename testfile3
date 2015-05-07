@@ -1,5 +1,7 @@
 class Foo
-  
+  def to_s
+    "An instance of class Foo"
+
   def bar(a,b)
     @qaax = a + b
     @baz = a * b

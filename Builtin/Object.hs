@@ -5,6 +5,7 @@ import Builtin.Bindings (initialize)
 import Object
 import AST
 import Eval
+import Parser (parseFile)
 import Object.Spawn
 import Context
 import String
@@ -34,6 +35,7 @@ bootstrapset = M.fromList [
        , ("__initialize", VFunction initialize (0, Just 0))
        , ("debug", VFunction debug (0,Just 0))
        , ("eval", VFunction evalStr (1,Just 1))
+       , ("load", VFunction loadFn  (1,Just 1))
        ]
 
 debug _ = do
@@ -77,3 +79,15 @@ evalStr vs = do
   case parseString str' of -- fixme
     Left p   -> throwError p
     Right es -> replyM_ =<< (fmap last $ mapM eval es)
+
+load :: FilePath -> EvalM Value
+load file = do
+  ast <- liftIO $ parseFile file
+  case ast of
+    Left err -> throwError err
+    Right exprs -> eval $ Block exprs
+
+loadFn :: [Value] -> EvalM()
+loadFn [] = replyM_ VFalse
+loadFn [VString x] = load (string x) >>= replyM_
+loadFn _ = replyM_ VFalse

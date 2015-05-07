@@ -1,0 +1,3 @@
+#! /bin/sh
+
+ghc -outputdir tmp Main.hs
