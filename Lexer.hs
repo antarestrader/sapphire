@@ -1,6 +1,6 @@
 module Lexer where
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Bits
 import LineParser
@@ -18,10 +18,10 @@ data LexState = L
   }
 
 -- | the Lexer monad
-type Lexer = ErrorT String (State LexState)
+type Lexer = ExceptT String (State LexState)
 
 runLexer :: LexState -> Lexer a -> Either String a
-runLexer s m = evalState (runErrorT m) s
+runLexer s m = evalState (runExceptT m) s
 
 putInput :: AlexInput -> Lexer ()
 putInput t = modify (\s -> s{input = t})

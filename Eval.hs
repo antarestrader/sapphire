@@ -48,7 +48,7 @@ import Context
 import Var
 import Utils
 import Control.Monad
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
@@ -58,14 +58,14 @@ type Err = String
 
 -- | The moand in which Sapphire code runs.  It contains the Context, handles
 --   errors and allows for IO actions in the running program.
-type EvalM a= StateT Context (ErrorT Err IO) a
+type EvalM a= StateT Context (ExceptT Err IO) a
 
 -- | execute the EvalM action using the provided Context.
 runEvalM :: (EvalM a) -- ^ the action to be run
          -> Context   -- ^ the context to run it in
          -> IO (Either Err (a, Context))
 runEvalM e c = do
-  r <- try $ runErrorT $ runStateT e c
+  r <- try $ runExceptT $ runStateT e c
   case r of
     Right x -> return x
     Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
@@ -204,7 +204,7 @@ evalT (Apply var args) = do
   guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
   fn vals
-evalT (Call  expr msg args) = do
+evalT (Call expr msg args) = do
   val <- eval expr
   r <- valToObj val
   vals <- mapM eval args

@@ -1,6 +1,6 @@
 module Builtin.Hash where
 
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M

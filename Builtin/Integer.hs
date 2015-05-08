@@ -4,7 +4,7 @@ import Builtin.Utils
 import Context
 import Object
 import String
-import Control.Monad.Error
+import Control.Monad.Except
 import qualified Data.Map as M
 
 integerClass = buildClass "Integer" bootstrap

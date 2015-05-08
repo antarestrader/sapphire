@@ -3,7 +3,7 @@ module Builtin.Utils where
 import qualified Data.Map as M
 import Control.Monad.IO.Class
 import Control.Monad.State (gets)
-import Control.Monad.Error
+import Control.Monad.Except
 import {-# SOURCE #-} Eval
 import Object
 import AST

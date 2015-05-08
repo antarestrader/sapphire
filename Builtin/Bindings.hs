@@ -13,7 +13,7 @@ import Builtin.Real
 import Builtin.Bool
 import Object
 import qualified Data.Map as M
-import Control.Monad.Error
+import Control.Monad.Except
 
 initialize :: [Value] -> EvalM ()
 initialize _ = do

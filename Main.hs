@@ -4,7 +4,7 @@ module Main where
 import System.Environment
 import System.Exit
 import System.IO
-import Control.Monad.Error
+import Control.Monad.Except
 import qualified Data.Map as M
 import LineParser (parseCode)
 import Tokens

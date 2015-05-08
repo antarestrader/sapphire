@@ -15,7 +15,7 @@ import Parser(parseString)
 import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.IO.Class
-import Control.Monad.Error
+import Control.Monad.Except
 
 objectClass = spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
