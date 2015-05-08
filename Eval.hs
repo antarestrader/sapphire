@@ -142,7 +142,9 @@ eval (ApplyFn fnExp args) = do
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
-eval (Block exps) = fmap last $ mapM eval exps
+eval (Block exps file) = do
+  insertLocalM "__FILE__" $ VString $ mkStringLiteral file
+  fmap last $ mapM eval exps
 
 eval (If pred cons alt) = do
   r <- eval pred
@@ -222,7 +224,9 @@ evalT (Call expr msg args) = do
       guardR "Wrong number of arguments." $ checkArity arity $ length vals
       method vals
     -- TODO: put self back (see issue #28 on github)
-evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exps)
+evalT (Block exps file) = do
+  insertLocalM "__FILE__" $ VString $ mkStringLiteral file
+  mapM_ eval (init exps) >> evalT (last exps)
 evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons

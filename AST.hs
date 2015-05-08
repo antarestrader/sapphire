@@ -44,7 +44,7 @@ data Exp =
     --   class.
   | EClass Var (Maybe Var) Exp
   | Module Var Exp -- ^ Create or reopen a module
-  | Block [Exp]  -- ^ A block of sequential expressions.
+  | Block [Exp] FilePath -- ^ A block of sequential expressions.
     deriving Show
 
 -- | Left Hand Side data structure

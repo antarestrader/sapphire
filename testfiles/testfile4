@@ -1,0 +1,8 @@
+load "testfiles/testfile3"
+
+puts "In file #{__FILE__}"
+
+f = Foo.spawn
+
+f.bar 45,12
+puts f.foo

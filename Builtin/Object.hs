@@ -86,7 +86,7 @@ load file = do
   ast <- liftIO $ parseFile file
   case ast of
     Left err -> throwError $ Err "ParserError" err []
-    Right exprs -> eval $ Block exprs
+    Right exprs -> eval $ Block exprs file
 
 loadFn :: [Value] -> EvalM()
 loadFn [] = replyM_ VFalse

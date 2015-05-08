@@ -170,7 +170,7 @@ block  = do
         runParser' exprs False file tokens
   case result of
     Left p -> parserFail p  -- check here for problems with large nested error messages
-    Right exps ->  return $ Block exps
+    Right exps ->  return $ Block exps file
 
 -- | Extract a block from the end of the line but leave it unevaluated as it
 --   may not contain sapphire code (a comment for example)
@@ -427,7 +427,8 @@ ifBlock' = nakedThenBlock <|> thenLine <|> simpleBlock
       return (cons, alt)
     simpleBlock = do
       exps <- exprs
-      return (Block exps, Nothing)
+      file <- sourceName `fmap` getPosition 
+      return (Block exps file, Nothing)
     elseParse = optionMaybe (keyword "else" >> (block <|> termExpr))
 
 classParser :: TParser Exp
