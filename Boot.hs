@@ -12,8 +12,10 @@ import Context
 import Eval
 import Object
 import Object.Spawn
+import String
 import Continuation (send, newContIO)
 import qualified Data.Map as M
+import System.Environment
 
 -- | This function builds up the initial runtime. The run time includes
 --   Object and Class classes with the internal functions installed. The
@@ -31,7 +33,9 @@ boot = do
 
   let self = Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
   context <- newContextIO self responderObject
-  r <- runEvalM (load "base/base.sap") context
+  file <- getExecutablePath
+  let context' = insertLocals "__FILE__"  (VString $ mkStringLiteral file) context
+  r <- runEvalM (load "base/base.sap") context'
   case r of
     Left err -> putStrLn (show err) >> return context
     Right (res, c) -> return c

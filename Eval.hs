@@ -143,8 +143,11 @@ eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
 eval (Block exps file) = do
+  file' <- gets $ lookupLocals "__FILE__"
   insertLocalM "__FILE__" $ VString $ mkStringLiteral file
-  fmap last $ mapM eval exps
+  v <- fmap last $ mapM eval exps
+  insertLocalM "__FILE__" $ maybe VNil id file'
+  return v
 
 eval (If pred cons alt) = do
   r <- eval pred
