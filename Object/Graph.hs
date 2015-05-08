@@ -67,9 +67,9 @@ import {-# SOURCE #-} Eval
 import {-# SOURCE #-} Builtin.Bindings
 import Var
 import AST
+import Err
 
-
-import Control.Monad.Error.Class
+import Control.Monad.Except
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Monad.State.Class
@@ -143,9 +143,15 @@ moself = MO (\f val' -> modifySelf (f val'))
 
 data MutableValue = MV (Value -> EvalM()) Value
 
+mutableValueToValue :: MutableValue -> Value
+mutableValueToValue (MV _ val) = val
+
+alterMV :: MutableValue -> Value -> EvalM()
+alterMV (MV f _) val = f val
+
 mvnil =  MV (\_-> return ()) VNil
 
-mverror = MV (\_ -> throwError "Attempted to mutate a Class variable")
+mverror = MV (\_ -> throwError $ strMsg "Attempted to mutate a Class variable")
 
 searchLocal :: String -> EvalM(Maybe MutableValue)
 searchLocal str = runMaybeT $ msum $ [a,b]
@@ -168,7 +174,7 @@ searchObject str (MO update obj) = runMaybeT $ msum $ map MaybeT [a,b,c]
 searchClass :: String -> Object -> EvalM(Maybe Value)
 searchClass _ ROOT = return Nothing
 searchClass str (Pid p) = responseToMaybe $ remoteClass str p
-searchClass str Object{} = throwError "Tried to find class methods on an object that was not a class."
+searchClass str obj@Object{} = throwError $ Err "GraphSearchError" "Tried to find class methods on an object that was not a class." [VObject obj]
 searchClass str cls@Class{} = runMaybeT $ msum $ map MaybeT [a,b,c]
   where a = return $ directCVars str cls
         b = searchModules str (cmodules cls) 
@@ -179,7 +185,7 @@ searchModules str ms = runMaybeT $ msum $ map (MaybeT . searchCVars str) ms
 
 searchCVars :: String -> Object -> EvalM(Maybe Value)
 searchCVars str ROOT = return Nothing
-searchCVars str Object{} = throwError "Tried to find class methods on an object that was not a class."
+searchCVars str obj@Object{} = throwError $ Err "GraphSearchError" "Tried to find class methods on an object that was not a class." [VObject obj]
 searchCVars str (Pid p) = responseToMaybe $ remoteCVars str p
 searchCVar str cls@Class{} = return $ directCVars str cls
 
@@ -198,7 +204,7 @@ responseToMaybe action = do
   case r of
     (Response value) -> return $ Just value
     (NothingFound)   -> return Nothing
-    (Error str)      -> throwError str
+    (Error err)      -> throwError err
 
 -- Lookup
 
@@ -213,7 +219,7 @@ lookupVar var = do
     case (r,bottom var) of
       (Just v,  Nothing ) -> return v
       (Nothing, Nothing ) -> return $ MV (insertLocalM str) VNil
-      (Nothing, Just _  ) -> throwError $ str ++ " not found"
+      (Nothing, Just _  ) -> throwError $ Err "NotFoundError" str []
       (Just v, Just var') -> lookupVarIn var' v
   where
     lookupVarIn :: Var -> MutableValue -> EvalM(MutableValue)
@@ -224,7 +230,7 @@ lookupVar var = do
       case (r,bottom var) of 
         (Just v',  Nothing ) -> return v'
         (Nothing, Nothing ) -> return mvnil
-        (Nothing, Just _  ) -> throwError $ str ++ " not found"
+        (Nothing, Just _  ) -> throwError $ Err "NotFoundError" str [mutableValueToValue v]
         (Just v', Just var') -> lookupVarIn var' v'
 
 mutableValueToMutableObject :: MutableValue -> EvalM (MutableObject)

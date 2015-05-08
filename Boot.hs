@@ -33,5 +33,5 @@ boot = do
   context <- newContextIO self responderObject
   r <- runEvalM (load "base/base.sap") context
   case r of
-    Left err -> putStrLn err >> return context
+    Left err -> putStrLn (show err) >> return context
     Right (res, c) -> return c

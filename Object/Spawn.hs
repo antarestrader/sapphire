@@ -12,6 +12,7 @@ import Object
 import Object.Graph
 import {-# SOURCE #-} Eval
 import AST
+import Err
 import Var
 import Context
 import qualified Data.Map as M
@@ -59,7 +60,7 @@ responderObject obj msg =
           C.reply (snd msg) (Response val) >> (return $ obj{modules = (obj:(modules obj))})
     PushCModule val@(VObject obj) -> case obj of
       Class{cmodules = c} -> C.reply (snd msg) (Response val) >> (return $ obj{cmodules = (obj:c)})
-      _ -> C.reply (snd msg) (Error "Object is not a class") >>  (return $ obj)
+      _ -> C.reply (snd msg) (Error $ Err "RunTimeError" "Object is not a class" [VObject obj]) >>  (return $ obj)
     Execute     var args  -> call obj var args (snd msg)
     Initialize  pid -> do
       obj' <- initialize pid obj
@@ -79,9 +80,9 @@ evaluate exp obj cont = do
     Left  err -> C.reply cont (Response $ VError err) >> return obj
     Right (val,context) -> C.reply cont (Response val) >> return (self context)  -- not proper tail call
 
--- WARNING: this function looses mutiations to oBject if that is important
+-- WARNING: this function looses mutiations to Object if that is important
 -- use evaluate instead.
-run :: Object -> Continuation -> (String -> a) -> EvalM a -> IO a
+run :: Object -> Continuation -> (Err Value -> a) -> EvalM a -> IO a
 run obj cont fixerror action = do
   let context = newContext obj cont responderObject
   result <- runEvalM action context

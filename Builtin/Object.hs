@@ -4,6 +4,7 @@ import Builtin.Utils hiding (call)
 import Builtin.Bindings (initialize)
 import Object
 import AST
+import Err
 import Eval
 import Parser (parseFile)
 import Object.Spawn
@@ -55,7 +56,7 @@ to_s [] = do
   v <- eval (EIVar "__value")
   replyM_ $ VString $ mkStringLiteral $ show v
 
-call _ = replyM_ $ VError "Function call on an object that does not act like a function"
+call _ = replyM_ $ VError $ Err "RunTimeError" "Function call on an object that does not act like a function" []
 
 puts :: [Value] -> EvalM ()
 puts vals = do
@@ -76,15 +77,15 @@ evalStr [] = replyM_ VNil
 evalStr vs = do
   let [Just str,filename,lineno,binding] = take 4 $ map Just vs ++ repeat Nothing
   str' <- toString str
-  case parseString str' of -- fixme
-    Left p   -> throwError p
+  case parseString str' of -- Todo: include file name, line number and binding
+    Left p   -> throwError $ Err "ParserError" p [str]
     Right es -> replyM_ =<< (fmap last $ mapM eval es)
 
 load :: FilePath -> EvalM Value
 load file = do
   ast <- liftIO $ parseFile file
   case ast of
-    Left err -> throwError err
+    Left err -> throwError $ Err "ParserError" err []
     Right exprs -> eval $ Block exprs
 
 loadFn :: [Value] -> EvalM()

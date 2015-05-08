@@ -1,6 +1,7 @@
 module Builtin.Real where
 
 import Builtin.Utils
+import Err
 import Context
 import Object
 import String
@@ -28,7 +29,7 @@ add [val] = do
 add (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to add "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to add "++(show slf)++" and "++(string ss)) [slf,val]
 
 sub ((VFloat b):[]) = do
   (VFloat a) <- innerValue
@@ -48,7 +49,7 @@ sub [val] = do
 sub (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to subtract "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to subtract "++(show slf)++" and "++(string ss)) [slf,val]
 
 mult ((VFloat b):_) = do
   (VFloat a) <- innerValue
@@ -62,7 +63,7 @@ mult [val] = do
 mult (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to multiply "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to multiply "++(show slf)++" and "++(string ss)) [slf,val]
 
 sapDiv ((VFloat b):[]) = do
   (VFloat a) <- innerValue
@@ -82,4 +83,4 @@ sapDiv [val] = do
 sapDiv (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to divide "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to divide "++(show slf)++" and "++(string ss)) [slf,val]

@@ -12,6 +12,7 @@ import Object
 import Object.Spawn (responderObject)
 import Builtin.Object (load)
 import AST
+import Err
 import Parser
 import Eval
 import Context
@@ -42,7 +43,7 @@ runFiles c [] = return c
 runFiles c (file : files) = do
   r' <- runEvalM (load file) c
   case r' of
-    Left err -> hPutStr stderr err >> exitFailure
+    Left err -> hPutStr stderr (show err) >> exitFailure
     Right (_, c') -> runFiles c files
 
 repl :: Context -> IO ()
@@ -56,7 +57,7 @@ repl c = do
                      eval $ Apply (simple "puts") [EValue r]
                      return r
            case result of
-             Left  err -> putStrLn ("Error: " ++ err) >> repl c
+             Left  err -> putStrLn (show err) >> repl c
              Right (val,c') -> do
                -- putStrLn $ show val
                repl $ merge [("it", val)] c'
@@ -101,7 +102,7 @@ interperter [""] c = repl c
 interperter [file] c = do
   r' <- runEvalM (load file) c
   case r' of
-    Left err -> putStrLn err >> system c
+    Left err -> putStrLn (show err) >> system c
     Right (res,c') -> putStrLn (show res) >> repl c'
 
 parser [""] c = parserREPL c
@@ -155,7 +156,7 @@ debugger [obj] c = do
 
 evaluate :: String -> EvalM Value
 evaluate str = case parseString str of
-   Left p  -> throwError $ p
+   Left p  -> throwError $ Err "ParserError" p []
    Right es -> fmap last $ mapM eval es
 
 prompt :: String -> IO String

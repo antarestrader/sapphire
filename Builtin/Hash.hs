@@ -5,6 +5,7 @@ import Control.Monad.State
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 import qualified Array as A
+import Err
 import Hash
 import Object
 import Object.Graph
@@ -22,12 +23,12 @@ valueToHKey (VAtom s)   = Just $ HKAtom s
 valueToHKey   _         = Nothing
 
 valueToHKeyM :: Value -> EvalM HKey
-valueToHKeyM VNil = throwError "Illigal value as key to a Hash."
+valueToHKeyM VNil = throwError $Err "RunTimeError" "Illigal value as key to a Hash." [VNil]
 valueToHKeyM val  = case valueToHKey val of
     Just hk -> return hk
     Nothing -> loop 12 val
   where
-    loop 0 _ = throwError "Infinate loop when deriving hash key."
+    loop 0 _ = throwError $ Err "RunTimeError" "Infinate loop when deriving hash key." [val]
     loop i val = do
       v' <- eval (Call (EValue val) "to_hashable" [])
       case valueToHKey v' of

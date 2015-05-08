@@ -5,12 +5,11 @@ import {-# SOURCE #-} AST
 import {-# SOURCE #-} Object
 import Control.Monad.Except
 import Control.Monad.State
+import Err
 
-type Err = String
+type EvalM a= StateT Context (ExceptT (Err Value) IO) a
 
-type EvalM a= StateT Context (ExceptT Err IO) a
-
-runEvalM :: (EvalM a) -> Context -> IO (Either Err (a, Context))
+runEvalM :: (EvalM a) -> Context -> IO (Either (Err Value) (a, Context))
 
 eval  ::  Exp -> EvalM Value
 evalT ::  Exp -> EvalM ()

@@ -1,6 +1,7 @@
 module Builtin.Integer where
 
 import Builtin.Utils
+import Err
 import Context
 import Object
 import String
@@ -33,7 +34,7 @@ add [val] = do
 add (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to add "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to add "++(show slf)++" and "++(string ss)) [slf,val]
 
 sub ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -53,7 +54,7 @@ sub [val] = do
 sub (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to subtract "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to subtract "++(show slf)++" and "++(string ss)) [slf,val]
 
 mult ((VInt b):_) = do
   (VInt a) <- innerValue
@@ -67,7 +68,7 @@ mult [val] = do
 mult (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to multiply "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to multiply "++(show slf)++" and "++(string ss)) [slf,val]
 
 sapDiv ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -87,7 +88,7 @@ sapDiv [val] = do
 sapDiv (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to divide "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to divide "++(show slf)++" and "++(string ss)) [slf,val]
 
 lt ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -107,7 +108,7 @@ lt [val] = do
 lt (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to compare "++(show slf)++" and "++(string ss) 
+  throwError $ Err "NumericError" ("Unable to compare "++(show slf)++" and "++(string ss)) [slf,val]
 
 gt ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -127,7 +128,7 @@ gt [val] = do
 gt (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to compare "++(show slf)++" and "++(string ss)) [slf,val]
 
 gte ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -147,7 +148,7 @@ gte [val] = do
 gte (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to compare "++(show slf)++" and "++(string ss)) [slf,val]
 
 lte ((VInt b):[]) = do
   (VInt a) <- innerValue
@@ -167,7 +168,7 @@ lte [val] = do
 lte (val:_) = do
   slf <- innerValue
   (VString ss) <- call val "to_s" []
-  throwError $ "Unable to compare "++(show slf)++" and "++(string ss)
+  throwError $ Err "NumericError" ("Unable to compare "++(show slf)++" and "++(string ss)) [slf,val]
 
 eq ((VInt b):_) = do
   (VInt a) <- innerValue

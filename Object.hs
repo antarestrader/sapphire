@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
 import String
+import Err
 import Array (Array)
 import qualified Array as A
 import Hash (Hash)
@@ -30,13 +31,13 @@ data Value =
   | VAtom !String
   | VFunction{function::Fn, arity::Arity}
   | VObject !Object -- may want to make this strict in Object
-  | VError !String
+  | VError (Err Value)
 
 vnil :: Value
 vnil = VNil
 
 verror :: String -> Value
-verror = VError
+verror = VError . strMsg
 
 instance Eq Value where
   (VInt i) == (VInt j) = i == j
@@ -65,7 +66,7 @@ instance Show Value where
   show (VObject (Object {})) = "<Object>"
   show (VObject (Pid (t,_))) = "<PID "++ show t ++">"
   show (VObject (Class  {properName = n})) = "<Class "++n++">"
-  show (VError err) = "<ERROR: " ++ err ++" >"
+  show (VError err) = "<ERROR: " ++ show err ++" >"
 
 type Arity = (Int,Maybe Int)
 
@@ -110,11 +111,11 @@ data Message =
 
 data SearchIn = IVars | CVars | ObjectGraph | ClassGraph
 
-data Response = Response Value | NothingFound | Error String
+data Response = Response Value | NothingFound | Error (Err Value)
 
 responseToValue (Response v) = v
 responseToValue (NothingFound) = vnil
-responseToValue (Error str) = VError "str"
+responseToValue (Error err) = VError err
 
 type Continuation = C.Continuation Message Response
 type Process = C.ProcessId Message Response

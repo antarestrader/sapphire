@@ -4,6 +4,7 @@ where
 
 import {-# SOURCE #-} Eval
 import AST
+import Err
 import Var
 import Context
 import Builtin.Array
@@ -52,7 +53,7 @@ bindPrimitiveObject val@(VTrue) = do
 bindPrimitiveObject val@(VFalse) = do
   cls <- getPrimClass "FalseClass"
   return $ buildPrimInstance cls val
-bindPrimitiveObject val = throwError $ "No Class for this type: " ++ show val --TODO impliment classes
+bindPrimitiveObject val = throwError $ Err "SystemError" "No Class for this type" [val] --TODO impliment classes
 
 -- | lookup the class for primitive values in the current context.
 --   (internal function)
@@ -61,7 +62,7 @@ getPrimClass str = do
   cls' <- (eval $ EVar $ simple str)
   case cls' of
     (VObject obj) -> return obj
-    _ -> throwError $ "System Error: Primitive class not found: " ++ str
+    _ -> throwError $ Err "Syster Error" ("Primitive class not found: " ++ str) []
 
 -- | Given the primitive class and a primitive value build in instance.
 --   (internal function)

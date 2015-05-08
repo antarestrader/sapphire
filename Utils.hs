@@ -1,19 +1,11 @@
-{-# LANGUAGE FlexibleInstances #-}
 module Utils where
 
 import Control.Monad.Except
 import Object
+import Err
 import Var
 import AST
 import Data.Map as M
-
-class Error e where
-  strMsg :: String -> e
-  noMsg :: e
-  noMsg = strMsg ""
-
-instance Error String where
-  strMsg = id 
 
 guardR :: (Error e, MonadError e m)=> String -> Bool -> m ()
 guardR _ True = return ()

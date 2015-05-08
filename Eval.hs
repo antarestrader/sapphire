@@ -37,6 +37,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Monoid
 import AST
+import Err
 import Object
 import Object.Graph
 import Object.Spawn
@@ -54,21 +55,19 @@ import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
-type Err = String
-
 -- | The moand in which Sapphire code runs.  It contains the Context, handles
 --   errors and allows for IO actions in the running program.
-type EvalM a= StateT Context (ExceptT Err IO) a
+type EvalM a= StateT Context (ExceptT (Err Value) IO) a
 
 -- | execute the EvalM action using the provided Context.
 runEvalM :: (EvalM a) -- ^ the action to be run
          -> Context   -- ^ the context to run it in
-         -> IO (Either Err (a, Context))
+         -> IO (Either (Err Value) (a, Context))
 runEvalM e c = do
   r <- try $ runExceptT $ runStateT e c
   case r of
     Right x -> return x
-    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ show e
+    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) [] 
 
 -- |Turns an expression into a value, potentially performing
 --  side effects along the way.
@@ -108,7 +107,11 @@ eval (Call expr msg args) = do
     Pid pid -> (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
       (result, obj') <- with receiver $ do
-        (method, arity) <- fnFromVar (simple msg)
+        (method, arity) <- let
+                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
+                             handler err = throwError err
+                           in
+                             fnFromVar (simple msg) `catchError` handler
         guardR  "Wrong number of arguments." $ checkArity arity $ length vals
         extract $ method vals -- proper tail calls here
       f $ VObject obj' -- update self
@@ -178,7 +181,7 @@ eval (EHash xs) = do
   hash <- buildHashFromList x's
   return $ VHash hash
 
-eval exp = throwError $ "Cannot yet evaluate the following expression:\n" ++ show exp
+eval exp = throwError $Err "SystemError" ("Cannot yet evaluate the following expression:\n" ++ show exp) []
 
 -- | Eval with context update
 --   When an expression could destructivally modify a sub-expression, it is
@@ -211,10 +214,14 @@ evalT (Call expr msg args) = do
   case r of
     Pid pid -> tailM pid (Execute (simple msg) vals)
     receiver -> fmap fst $ with receiver $ do
-      (method, arity) <- fnFromVar (simple msg)
+      (method, arity) <- let
+                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
+                             handler err = throwError err
+                           in
+                             fnFromVar (simple msg) `catchError` handler
       guardR "Wrong number of arguments." $ checkArity arity $ length vals
       method vals
-    -- TODO put self back (see issue #28 on github)
+    -- TODO: put self back (see issue #28 on github)
 evalT (Block exps) = mapM_ eval (init exps) >> evalT (last exps)
 evalT (If pred cons alt) = do
   r <- eval pred
@@ -233,11 +240,11 @@ evalT exp = eval exp >>= replyM_  -- General case
 -- can pretend to be a function.
 fnFromVar :: Var -> EvalM (Fn, Arity)
 fnFromVar var = do
-  MV _ val <- lookupVar var
+  MV _ val <- lookupVar var  -- TODO: Catch "NotFoundError" and impliment Method Missing
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
-    (VError _) -> throwError $ "Function or Method not found: " ++ show var
-    VNil  -> throwError $ "Function or Method not found: " ++ show var
+    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals 
+    VNil  -> throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
     val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
 
 -- | The inner workings of Class creation
@@ -280,8 +287,8 @@ mkFunct params exp vals = do
   where
     assignParams :: [Parameter] -> [Value] -> EvalM [(String,Value)]
     assignParams [] [] = return []
-    assignParams [] _ = throwError "Function called with too many arguments"
-    assignParams ((Param str):ps) [] = throwError "Function called with too few arguments"
+    assignParams [] _ = throwError $ Err "RunTimeError" "Function called with too many arguments" []
+    assignParams ((Param str):ps) [] = throwError $ Err "RunTimeError" "Function called with too few arguments" []
     assignParams ((Default str exp):ps) [] = do
       val <- eval exp
       ps' <- assignParams ps []

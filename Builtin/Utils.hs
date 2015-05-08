@@ -7,6 +7,7 @@ import Control.Monad.Except
 import {-# SOURCE #-} Eval
 import Object
 import AST
+import Err
 import Context (self, replyM_)
 import Object.Graph (lookupIVar, MutableValue(..))
 import {-# SOURCE #-} Object.Spawn (spawn)
@@ -17,7 +18,7 @@ innerValue :: EvalM Value
 innerValue = do
   val <- lookupIVar "__value"
   case val of
-    (MV _ VNil) -> return $ VError "Internal Value at @__value was not found in self"
+    (MV _ VNil) -> return $ VError $ Err "SystemError" "Internal Value at @__value was not found in self" [] 
     (MV _ v) -> return v
 
 updateInnerValue :: Value -> EvalM ()
@@ -61,7 +62,7 @@ toString :: Value -> EvalM String
 toString val = loop val 12
   where
     loop (VString str) _ = return $ string str
-    loop _ 0 = throwError $ (show val) ++ " refuses to be converted to a String"
+    loop _ 0 = throwError $ Err "RunTimeError" "Value refuses to be converted to a String" [val]
     loop val' n = do
       val'' <- eval (Call (EValue val') "to_s" [])
       loop val'' (n-1)
