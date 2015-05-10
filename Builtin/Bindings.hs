@@ -12,6 +12,7 @@ import Builtin.Hash
 import Builtin.Integer
 import Builtin.Real
 import Builtin.Bool
+import Builtin.Directory
 import Object
 import qualified Data.Map as M
 import Control.Monad.Except
@@ -23,6 +24,7 @@ initialize _ = do
   integerClass
   realClass
   boolClasses
+  directoryClass
   replyM_ VNil
 
 bindPrimitiveObject ::  Value -> EvalM Object

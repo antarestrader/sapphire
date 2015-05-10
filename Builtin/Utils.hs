@@ -26,12 +26,12 @@ updateInnerValue val = do
   (MV f _) <- lookupIVar "__value"
   f val
 
-buildClass :: String -> M.Map String Value -> EvalM Object
-buildClass name bootstrap = do
+buildClassEx :: String -> M.Map String Value -> M.Map String Value -> EvalM Object
+buildClassEx name bootstrap clsBoot = do
   VObject superClass <- eval ( EVar $ simple "Object")
   VObject clsClass   <- eval ( EVar $ simple "Class")
   let cls =  Class
-          { ivars = M.empty
+          { ivars = clsBoot
           , klass = clsClass
           , modules = []
           , process = Nothing
@@ -44,6 +44,9 @@ buildClass name bootstrap = do
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
   eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
   return pid
+
+buildClass :: String -> M.Map String Value -> EvalM Object
+buildClass a b = buildClassEx a b M.empty  
 
 mkBool :: Bool -> Value
 mkBool True = VTrue
