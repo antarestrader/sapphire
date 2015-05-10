@@ -57,8 +57,8 @@ data LHS =
   | LIVar String
   | LCVar String
   | LIndex Exp [Exp]
-  | LCall Exp String
-  | LSend Exp String deriving Show
+  | LCall Exp String [Exp]
+  | LSend Exp String [Exp] deriving Show
 
 data Parameter =
     Param String

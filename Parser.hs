@@ -382,11 +382,16 @@ assign lhs' = do
   assignP
   lhs <- transLHS lhs'
   rhs <- expr
-  return $ Assign lhs rhs
+  case lhs of -- turn call, send and index into the appropriately renamed method calls 
+    (LCall exp msg args) -> return $ Call exp msg   (args ++ [rhs])
+    (LSend exp msg args) -> return $ Send exp msg   (args ++ [rhs])
+    (LIndex exp args)    -> return $ Call exp "[]=" (args ++ [rhs])
+    lhs                  -> return $ Assign lhs rhs
 
 transLHS :: Exp -> TParser LHS
-transLHS (EVar v) = return $ LVar v --TODO add indexed, called, and sent here
+transLHS (EVar v) = return $ LVar v --TODO add indexed
 transLHS (EIVar s) = return $ LIVar s
+transLHS (Call exp s args) = return $ LCall exp (s++"=") args
 transLHS exp = fail $ "illigal Left Hand Side of assignment expression: " ++ (show exp)
 
 ifParser :: TParser Exp

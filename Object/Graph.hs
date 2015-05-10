@@ -264,6 +264,8 @@ insertLHS (LVar var) val = do
   f val
 insertLHS (LIVar str) val = insertIVarSelf str val
 insertLHS (LCVar str) val = modifySelf $ insertCVars str val
-insertLHS (LIndex exp args) val = evalT (Call exp "[]=" (args ++ [EValue val]))
-insertLHS (LCall exp str) val = evalT (Call exp (str++"=") [EValue val])
-insertLHS (LSend exp str) val = evalT (Send exp (str++"=") [EValue val])
+-- In theory, the parser will never create these, prefering to make this same
+-- translation itself.  These are left here for the sake of having a total function.
+insertLHS (LIndex exp args)    val = evalT (Call exp "[]=" (args ++ [EValue val]))
+insertLHS (LCall exp str args) val = evalT (Call exp str   (args ++ [EValue val]))
+insertLHS (LSend exp str args) val = evalT (Send exp str   (args ++ [EValue val]))
