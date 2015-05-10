@@ -139,6 +139,9 @@ remoteClass str p = dispatchM p (Search ClassGraph str)
 
 data MutableObject = MO ((Value -> Object -> Object) -> Value -> EvalM ()) Object
 
+-- moself slf thurn slf into a mutable object with the assumption that slf
+-- is the focus-object of the current context (that is self).
+moself :: Object -> MutableObject
 moself = MO (\f val' -> modifySelf (f val'))
 
 data MutableValue = MV (Value -> EvalM()) Value
@@ -149,7 +152,10 @@ mutableValueToValue (MV _ val) = val
 alterMV :: MutableValue -> Value -> EvalM()
 alterMV (MV f _) val = f val
 
-mvnil =  MV (\_-> return ()) VNil
+mvnil :: String -> MutableObject -> MutableValue
+mvnil _   (MO _ ROOT)    =  MV (\_-> return ()) VNil
+mvnil str (MO _ (Pid p)) = MV (\val' -> sendM p (SetIVar str val') >> return ()) VNil
+mvnil str (MO update _)  = MV (updateIvars str update) VNil
 
 mverror = MV (\_ -> throwError $ strMsg "Attempted to mutate a Class variable")
 
@@ -194,7 +200,7 @@ searchIVars str (MO _ ROOT) = return Nothing
 searchIVars str (MO _ (Pid p)) =do
   r <-responseToMaybe $ remoteIVars str p
   return $ fmap (MV (\val' -> sendM p (SetIVar str val') >> return ())) r
-searchIVars str (MO update obj)  = return $ fmap (MV $updateIvars str update) $ directIVars str obj
+searchIVars str (MO update obj)  = return $ fmap (MV $ updateIvars str update) $ directIVars str obj
 
 updateIvars str alt = alt (\val obj'->insertIVars str val obj') -- Late at night, find bugs here
 
@@ -229,7 +235,7 @@ lookupVar var = do
       r <- searchIVars str obj
       case (r,bottom var) of 
         (Just v',  Nothing ) -> return v'
-        (Nothing, Nothing ) -> return mvnil
+        (Nothing, Nothing ) -> return $ mvnil str obj
         (Nothing, Just _  ) -> throwError $ Err "NotFoundError" str [mutableValueToValue v]
         (Just v', Just var') -> lookupVarIn var' v'
 
@@ -240,7 +246,7 @@ mutableValueToMutableObject (MV f val) = (MO undefined) `fmap` (valToObj val) --
 lookupSelf :: String -> EvalM(MutableValue)
 lookupSelf str= do
   slf <- gets self
-  fmap (maybe mvnil id)  $ searchObject str (moself slf)
+  fmap (maybe (mvnil str (moself slf)) id)  $ searchObject str (moself slf)
 
 lookupIVar :: String -> EvalM(MutableValue)
 lookupIVar str = do 
