@@ -117,12 +117,12 @@ eval (Call expr msg args) = do
       f $ VObject obj' -- update self
       return $ responseToValue result
 
-eval (Index expr arg) = do
+eval (Index expr args) = do
   val <- eval expr
-  idx <- eval arg
-  case (val,idx) of
-    (VArray a, VInt i) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
-    (v,i) -> eval (Call (EValue v) "[]" [EValue i])
+  idxs <- mapM eval args
+  case (val,idxs) of
+    (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
+    (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
 
 eval (Apply var args) = do
   (fn, arity) <- fnFromVar var

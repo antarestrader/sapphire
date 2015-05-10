@@ -389,9 +389,10 @@ assign lhs' = do
     lhs                  -> return $ Assign lhs rhs
 
 transLHS :: Exp -> TParser LHS
-transLHS (EVar v) = return $ LVar v --TODO add indexed
+transLHS (EVar v) = return $ LVar v
 transLHS (EIVar s) = return $ LIVar s
 transLHS (Call exp s args) = return $ LCall exp (s++"=") args
+transLHS (Index exp args ) = return $ LIndex exp args 
 transLHS exp = fail $ "illigal Left Hand Side of assignment expression: " ++ (show exp)
 
 ifParser :: TParser Exp
@@ -472,7 +473,7 @@ lambda = do
 
 -- | An extension parser checking for indexing brackets @foo[1]@
 indexed exp = do
-  idx <- between bopen bclose expr <?> "index expression ([...])"
+  idx <- between bopen bclose (sepBy expr comma) <?> "index expression ([...])"
   return $ Index exp idx
 
 -- | An extension paser loking for method calls of the form @foo.bar@

@@ -27,7 +27,7 @@ data Exp =
     --   into a tree structure using Dykstra's Yard Shuninig Algorithm found
     --   in Eval.hs.
   | OpStr Exp [(Op,Exp)]
-  | Index Exp Exp -- ^ an expression followed by an index (foo[3])
+  | Index Exp [Exp] -- ^ an expression followed by an index (foo[3])
   | Lambda [Parameter] Exp -- ^ an anonymous function declairation
   | Def String [Parameter] Exp -- ^ a method declairartion
   | Apply Var [Exp] -- ^ application of the actual params [Exp] to the function found at var
