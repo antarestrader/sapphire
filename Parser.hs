@@ -129,6 +129,7 @@ tokenEq :: T -> TParser Token
 tokenEq t = tokenP (\t' -> if t == (token t') then Just t' else Nothing)
 
 comma  = tokenEq TComma        <?> "',' (comma)"
+bang   = tokenEq TBang         <?> "'!' (bang)"
 open   = tokenEq TOpen         <?> "'('"
 close  = tokenEq TClose        <?> "')'"
 bopen  = tokenEq TBracket      <?> "'['"
@@ -346,11 +347,30 @@ args p var =
   (argumentList p >>= (\args->return (Apply var args))) <|> return (EVar var)
 
 
+unaryOperator :: TParser Exp
+unaryOperator = do
+  o <- operator
+  e <- expr0
+  return $ Call e ("unary"++o) []
+  
+bangOperator  :: TParser Exp
+bangOperator = do
+  bang
+  e <- expr0
+  return $ Call e "not" [] 
+  
+
 -- | a sequence of expressions seperated by operators
 opStr :: Exp -> TParser Exp
 opStr e0 = do
     ops <- many1 op
     return $ OpStr e0 ops
+
+operator = do
+    tokenP testTok <?> "operator symbol"
+  where
+    testTok Token{ token=(TOperator op)} = Just op
+    testTok _ = Nothing
 
 -- | An operator and the expression which follows it.
 op :: TParser (Op,Exp)
@@ -492,7 +512,8 @@ sent exp = do
   return $ Send exp s args
 
 -- | expressions which can safely be understood as the first argument in an unenclosed argument list
-safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> ivar <|> atom <|> float <|> int <|> exString
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> 
+            ivar <|> atom   <|> float <|> int  <|>    exString <|> bangOperator
 
 safeExpr = do
     exp <- safeExpr0
@@ -507,9 +528,10 @@ safeExpr = do
 -- | The union of all basic expressions
 expr0 :: TParser Exp
 expr0 = paren
-     <|> nil <|> falseP      <|> trueP
-     <|> (var >>= args True) <|> ivar  <|> atom   <|> float
-     <|> int <|> exString    <|> arrayLiteral <|> hashLiteral <?> "basic expression unit"
+     <|> nil <|> falseP      <|> trueP <|> bangOperator <|> unaryOperator 
+     <|> (var >>= args True) <|> ivar  <|> atom         <|> float
+     <|> int <|> exString    <|> arrayLiteral           <|> hashLiteral 
+     <?> "basic expression unit"
 
 -- | The union of all extending parsers.  Given a base expression this
 --   parser will check the subsiquent token stream for extended forms such

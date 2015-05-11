@@ -29,6 +29,9 @@ class Number
   def sub(y)
     @__value - y
 
+  def "unary-"
+    0 - @__value
+
   def neg
     0 - @__value
 
@@ -36,6 +39,9 @@ class Number
     @__value * y
 
 class NilClass
+  def not
+    true
+
   def nil?
     true
 
