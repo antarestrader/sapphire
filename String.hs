@@ -6,6 +6,7 @@ module String
   ( SapString
   , mkStringLiteral
   , string
+  , stringLength
   ) where
 
 import qualified Data.Text.Lazy as T
@@ -22,6 +23,8 @@ instance Show SapString where
 
 instance Eq SapString where
   a == b = text a == text b
+
+stringLength s = fromIntegral $ T.length $ text s
 
 mkStringLiteral ::  String -> SapString
 mkStringLiteral s = SapString { escapes = [], text = T.pack s }

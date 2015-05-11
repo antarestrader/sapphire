@@ -19,3 +19,7 @@ class Array
   def push!(v)
     @__value = push v
     self
+
+  def include?(v)
+    inject(false) do |acc,val|
+      acc || v == val

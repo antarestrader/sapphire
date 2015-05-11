@@ -13,6 +13,7 @@ import Builtin.Integer
 import Builtin.Real
 import Builtin.Bool
 import Builtin.Directory
+import Builtin.String
 import Object
 import qualified Data.Map as M
 import Control.Monad.Except
@@ -25,6 +26,7 @@ initialize _ = do
   realClass
   boolClasses
   directoryClass
+  stringClass
   replyM_ VNil
 
 bindPrimitiveObject ::  Value -> EvalM Object

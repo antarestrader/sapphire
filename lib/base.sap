@@ -4,6 +4,24 @@ __initialize()
 
 load "lib/base/Array.sap"
 
+# require method
+
+Directory::required = [Directory.canonical "lib/base/Array"]
+
+class Object
+  def require(file)
+    file = Directory.canonical file
+    if (Directory::required.include? file).not
+        Directory::required.push! file
+        load file
+        true
+      else
+        false
+ 
+  def nil?
+    false 
+#end class Object
+
 class Number
   def add(y)
     @__value + y
@@ -16,10 +34,6 @@ class Number
 
   def call(y)
     @__value * y
-
-class Object
-  def nil?
-    false
 
 class NilClass
   def nil?
