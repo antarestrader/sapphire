@@ -7,6 +7,7 @@ import AST
 import Err
 import Var
 import Context
+import Builtin.Atom
 import Builtin.Array
 import Builtin.Hash
 import Builtin.Integer
@@ -27,6 +28,7 @@ initialize _ = do
   boolClasses
   directoryClass
   stringClass
+  atomClass
   replyM_ VNil
 
 bindPrimitiveObject ::  Value -> EvalM Object
@@ -56,6 +58,9 @@ bindPrimitiveObject val@(VTrue) = do
   return $ buildPrimInstance cls val
 bindPrimitiveObject val@(VFalse) = do
   cls <- getPrimClass "FalseClass"
+  return $ buildPrimInstance cls val
+bindPrimitiveObject val@(VAtom _) = do
+  cls <- getPrimClass "Atom"
   return $ buildPrimInstance cls val
 bindPrimitiveObject val = throwError $ Err "SystemError" "No Class for this type" [val] --TODO impliment classes
 
