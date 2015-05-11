@@ -2,6 +2,8 @@
 
 __initialize()
 
+load "lib/base/Array.sap"
+
 class Number
   def add(y)
     @__value + y
@@ -30,22 +32,6 @@ class String
 class Function
   def builtin?
     true
-
-class Array
-  def each(fn)
-    inject(nil) do |acc,val|
-      fn val
-
-  def map(fn)
-    inject([]) do |acc,val|
-      acc.push fn(val)
-  
-  def "[]"(i)
-    __index i
-
-  def push!(v)
-    @__value = push v
-    self
 
 class Integer
   def "!="(b)

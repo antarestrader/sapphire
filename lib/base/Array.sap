@@ -1,0 +1,21 @@
+# Saphire Core Library -- Array
+  Copyright 2015 John F. Miller
+
+class Array
+  # Built-in methods
+    length, __index, inject, push
+
+  def each(fn)
+    inject(nil) do |acc,val|
+      fn val
+
+  def map(fn)
+    inject([]) do |acc,val|
+      acc.push fn(val)
+  
+  def "[]"(i)
+    __index i
+
+  def push!(v)
+    @__value = push v
+    self

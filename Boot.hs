@@ -18,6 +18,9 @@ import Continuation (send, newContIO)
 import qualified Data.Map as M
 import System.Environment
 
+
+baseLibrary = "lib/base.sap"
+
 -- | This function builds up the initial runtime. The run time includes
 --   Object and Class classes with the internal functions installed. The
 --   object returned is an instance of Object sutable to running code.
@@ -36,7 +39,7 @@ boot = do
   context <- newContextIO self responderObject
   file <- getExecutablePath
   let context' = insertLocals "__FILE__"  (VString $ mkStringLiteral file) context
-  r <- runEvalM (load "base/base.sap") context'
+  r <- runEvalM (load baseLibrary) context'
   case r of
     Left err -> putStrLn (show err) >> return context
     Right (res, c) -> return c
