@@ -95,6 +95,7 @@ data T =
   TDot | TSend     |
   TScope | TSuper  |
   TAssign | TComma |
+  TBang            |
   TAssignOp String |
   TAtom  String    |
   THashAtom String |
