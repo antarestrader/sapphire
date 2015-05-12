@@ -338,6 +338,10 @@ buildModule n exp = do
   sendM pid $ Eval exp
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
 
+registerClass :: String -> Process -> EvalM Value
+registerClass n pid =
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom n, EValue $ VObject $ Pid pid] --fixme should be parent module
+
 -- | The internal working so making a function
 mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)
         -> Exp       -- the expression to be evaluated (typically a block)
