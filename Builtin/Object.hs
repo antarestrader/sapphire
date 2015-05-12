@@ -7,6 +7,7 @@ import AST
 import Err
 import Eval
 import Parser (parseFile)
+import Object.Graph
 import Object.Spawn
 import Context
 import String
@@ -29,14 +30,15 @@ objectClass = spawn $ Class{
         properName = "Object"}
 
 bootstrapset = M.fromList [
-         ("call", VFunction call (0,Nothing))
-       , ("puts", VFunction puts (0,Nothing))
-       , ("to_s", VFunction to_s (0,Just 0)) 
-       , ("cls" , VFunction cls  (0, Just 0))
+         ("call",   VFunction call     (0,Nothing))
+       , ("puts",   VFunction puts     (0,Nothing))
+       , ("to_s",   VFunction to_s     (0,Just 0)) 
+       , ("cls" ,   VFunction cls      (0, Just 0))
        , ("__initialize", VFunction initialize (0, Just 0))
-       , ("debug", VFunction debug (0,Just 0))
-       , ("eval", VFunction evalStr (1,Just 1))
-       , ("load", VFunction loadFn  (1,Just 1))
+       , ("debug",  VFunction debug    (0,Just 0))
+       , ("eval",   VFunction evalStr  (1,Just 1))
+       , ("load",   VFunction loadFn   (1,Just 1))
+       , ("extend", VFunction extendFn (1, Nothing))
        ]
 
 debug _ = do
@@ -92,3 +94,16 @@ loadFn :: [Value] -> EvalM()
 loadFn [] = replyM_ VFalse
 loadFn [VString x] = load (string x) >>= replyM_
 loadFn _ = replyM_ VFalse
+
+extendFn:: [Value] -> EvalM()
+extendFn mdls = do
+    obj <- gets self
+    obj' <- loop obj mdls
+    modifySelf $ const obj'
+    replyM_ VNil
+  where
+    loop obj [] = return obj
+    loop obj (x:xs) = do
+      o <- valToObj x
+      loop (obj{modules = (o:(modules obj))}) xs -- assumes that self is never a PID
+

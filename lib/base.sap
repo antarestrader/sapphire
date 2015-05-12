@@ -11,7 +11,7 @@ load "lib/base/Array.sap"
 
 Directory::required = [Directory.canonical "lib/base/Array"]
 
-class Object
+module System
   def require(file)
     file = Directory.canonical file
     if (Directory::required.include? file).not
@@ -20,7 +20,10 @@ class Object
         true
       else
         false
- 
+
+class Object
+  include System
+
   def nil?
     false
 
