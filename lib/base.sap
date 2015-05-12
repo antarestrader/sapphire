@@ -7,7 +7,7 @@ class Module <- Class
 
 load "lib/base/Array.sap"
 
-# require method
+# the require method
 
 Directory::required = [Directory.canonical "lib/base/Array"]
 
@@ -22,24 +22,13 @@ class Object
         false
  
   def nil?
-    false 
+    false
+
+  def "!="(b)
+    (self == b).not
 #end class Object
 
-module Number
-  def add(y)
-    @__value + y
-
-  def sub(y)
-    @__value - y
-
-  def "unary-"
-    0 - @__value
-
-  def neg
-    0 - @__value
-
-  def call(y)
-    @__value * y
+require "lib/base/Number.sap"
 
 class NilClass
   def not
@@ -56,6 +45,6 @@ class Function
   def builtin?
     true
 
-class Integer
-  def "!="(b)
-    (self == b).not
+
+
+

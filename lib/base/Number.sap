@@ -1,0 +1,27 @@
+module Number
+  def add(y)
+    @__value + y
+
+  def sub(y)
+    @__value - y
+
+  def "unary-"
+    0 - @__value
+
+  def "unary+"
+    @__value
+
+  def abs
+    if @__value <0 then -@__value else @__value
+
+  def neg
+    0 - @__value
+
+  def call(y)
+    @__value * y
+
+class Real
+  include Number
+
+class Integer
+  include Number

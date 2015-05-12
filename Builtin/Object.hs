@@ -44,7 +44,7 @@ debug _ = do
    case val of 
       VObject (Object{ivars = i}) -> do
         liftIO $ putStrLn $ show i
-      VObject (Class{ivars = i, cvars = c}) -> liftIO $ do
+      VObject (Class{ivars = i, cvars = c, cmodules = cs}) -> liftIO $ do
         putStrLn "IVars:"
         putStrLn $ show i
         putStrLn "CVars:"
