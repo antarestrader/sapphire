@@ -51,20 +51,21 @@ type ProcessId m r = (ThreadId, MessageQueue m r)
 type ContList m r = [ProcessId m r]
 
 -- | A function to process one message and provide a new state
-type Responder o m r = o -> Message m r -> IO o
+type Responder o m r = o -> Message m r -> IO (Maybe o)
 
 -- | Given and initial state and a Responder creates a process that
 --   will respond to messages and keep track of the state
 respondWith :: o -> Responder o m r ->  IO (ProcessId m r)
 respondWith o r = do
   queue <- newMessageQueue
-  tid <- forkIO (loop queue o)
+  tid <- forkIO (loop queue (Just o))
   return (tid, queue)
     where
-      loop queue o= do
+      loop queue (Just o)= do
         m  <- readQueue queue
         o' <- r o m
-        loop queue o'  --TODO end loop
+        loop queue o'
+      loop _ Nothing = return ()
 
 -- | The information needed to respond to a message. In order to avoid
 --   deadlocks it must also be provided to any down stream messages
@@ -116,7 +117,13 @@ dispatch obj responder cont pid msg = do
       loop answer (Queue chan) obj = do
         r <- atomically ((readTChan chan >>= (return . Left)) `orElse` (readTMVar answer >>= (return . Right)))
         case r of
-          Left m -> responder obj m >>= loop answer (Queue chan)
+          Left m -> do
+            obj' <- responder obj m 
+            case obj' of
+              Just obj''  -> loop answer (Queue chan) obj''
+              Nothing -> do  -- Process is told to terminate while waiting for answer
+                r' <- atomically $ readTMVar answer
+                return (r', obj)
           Right r' -> return (r', obj)
 
 -- | send this reply to the message
