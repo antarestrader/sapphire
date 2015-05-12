@@ -159,6 +159,12 @@ eval (EClass n super exp) = do
     VObject (Pid pid) -> sendM pid (Eval exp) >> return cls
     _ -> buildClass n super exp
 
+eval (Module n exp) = do
+  mdl <- eval (EVar n)
+  case mdl of 
+    VObject (Pid pid) -> sendM pid (Eval exp) >> return mdl
+    _ -> buildModule n exp
+
 eval (ExString xs) = do
     vals <- mapM eval xs
     concatenate [] vals
@@ -278,9 +284,26 @@ buildClass n super exp = do
 	  }
   Pid pid <- liftIO $ spawn cls
   sendM pid $ Eval exp
-  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid]
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
 
   return $ VObject $ Pid pid
+
+buildModule n exp = do
+  VObject superClass <- eval (EVar $ simple "Object")
+  VObject clsClass   <- eval (EVar $ simple "Module")
+  let mdl = Class
+          { ivars = M.empty
+	  , klass = clsClass
+	  , modules=[]
+	  , process = Nothing
+	  , super = superClass
+	  , cvars = M.empty
+          , cmodules = []
+	  , properName = name n
+	  }
+  Pid pid <- liftIO $ spawn mdl
+  sendM pid $ Eval exp
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
 
 -- | The internal working so making a function
 mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)

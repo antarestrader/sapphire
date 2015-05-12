@@ -465,6 +465,13 @@ classParser = do
   exp <- block <|> expr
   return $ EClass n s exp
 
+moduleParser :: TParser Exp
+moduleParser = do
+  keyword "module"
+  n <- var
+  exp <- block <|> expr
+  return $ Module n exp
+
 defParser :: TParser Exp
 defParser = do
   keyword "def"
@@ -553,7 +560,7 @@ expr1 = do
 
 -- | forms not subject to extending parsers. These parsers include their own
 --   intrensic check for line termination.
-statement = lambda <|> ifParser <|> defParser <|> defineParser <|> classParser
+statement = lambda <|> ifParser <|> defParser <|> defineParser <|> classParser <|> moduleParser
 
 -- | All possible forms of a single expression
 expr = statement <|> expr1

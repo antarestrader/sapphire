@@ -2,6 +2,9 @@
 
 __initialize()
 
+class Module <- Class
+  nil
+
 load "lib/base/Array.sap"
 
 # require method
@@ -22,7 +25,7 @@ class Object
     false 
 #end class Object
 
-class Number
+module Number
   def add(y)
     @__value + y
 
