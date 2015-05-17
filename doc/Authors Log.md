@@ -455,6 +455,43 @@ complex HashMap would work. I will need to make Value a good instance of EQ and
 possibly an instance of Hashable as well.  This could be tricky sense I cannot
 use the IO monad.
 
+
+## May 15, 2015
+
+### Scope of Classes and Modules
+
+What is the expecte behavior when the interpreter encounters a `class` or 
+`module` statement? Certianlly it should create a new class or reopen an
+existing one.  But where does it look?  The current comprimise is to put
+everything in `Object` but this is not the expected behavior.  Modules and
+Classes should create scope for thier nested children.  How do we impliment
+this? My first thought is to add a value to context pointing to the current
+scope.  But then how does `::Foo` work? I think it should still point to
+`Object`.
+
+Perhaps what is needed is a scope that can track both current and top scopes.
+
+Then there is the question of what scope is current in the middle of a method
+call.  It is fairly obvious how and where to switch scopes when opening classes
+and modules, but what about on calls into methods defined in those modules.
+Should this even be possible?
+
+## May 16, 2015
+
+## Explain the Code
+
+At some point it will become necessary for someone other thne me to understand
+how this code base works.  I hove though about a set or articles of perhaps
+videos that would take a prospective coder through the code explaining some of
+the decissions that lead to its current form.
+
+My idea to use the metaphor of exploring a cave system.  Once can start at the
+one of the natural enterences: 1) following the running process through starting
+from `Main.main` or 2) begining with a source file and following it through
+exicution. One could also take the elevator down to the most interesing parts
+and work back to the surface. That is start with `Object` or `Concurrent` and work
+outword.
+
 [alex-basic]: http://www.haskell.org/alex/doc/html/basic-api.html
 [alex-wrapper]: http://www.haskell.org/alex/doc/html/wrappers.html
 [alex-code]: https://github.com/simonmar/alex/blob/master/templates/wrappers.hs
