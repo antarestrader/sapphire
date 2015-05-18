@@ -42,9 +42,15 @@ setCVar [VAtom n,val] = do
 
 new [] = do
   slf <- gets self
+  let slf' = case slf of
+               pid@(Pid _) -> pid
+               Class{ process = Just pid } -> Pid pid
+               Class{ process = Nothing }  -> slf
+               _ -> error "trying to make instantiate a regular object.  What would that even mean?"
+
   let obj = VObject $ Object {
       ivars = M.empty
-    , klass = slf
+    , klass = slf'
     , modules = []
     , process = Nothing
     }
