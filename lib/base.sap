@@ -34,6 +34,9 @@ class Object
 require "lib/base/Number.sap"
 
 class NilClass
+  def to_s
+    "nil"
+
   def not
     true
 

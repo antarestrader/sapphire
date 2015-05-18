@@ -32,18 +32,23 @@ objectClass = spawn $ Class{
 bootstrapset = M.fromList [
          ("call",   VFunction call     (0,Nothing))
        , ("puts",   VFunction puts     (0,Nothing))
-       , ("to_s",   VFunction to_s     (0,Just 0)) 
+       , ("to_s",   VFunction to_s     (0,Just 0))
        , ("cls" ,   VFunction cls      (0, Just 0))
        , ("__initialize", VFunction initialize (0, Just 0))
        , ("debug",  VFunction debug    (0,Just 0))
        , ("eval",   VFunction evalStr  (1,Just 1))
        , ("load",   VFunction loadFn   (1,Just 1))
        , ("extend", VFunction extendFn (1, Nothing))
+       , ("method_missing", VFunction methodMissing (1, Nothing))
        ]
+
+methodMissing (msg:_) = do
+  slf <- gets self
+  throwError $ Err "MethodMissing" ("The method "++show msg++" not found.") [VObject slf]
 
 debug _ = do
    val <- eval (EVar Self)
-   case val of 
+   case val of
       VObject (Object{ivars = i}) -> do
         liftIO $ putStrLn $ show i
       VObject (Class{ivars = i, cvars = c, cmodules = cs}) -> liftIO $ do
@@ -56,15 +61,17 @@ debug _ = do
 
 to_s [] = do
   v <- eval (EIVar "__value")
-  replyM_ $ VString $ mkStringLiteral $ show v
+  case v of
+    VNil -> replyM_ $ VString $ mkStringLiteral $ "<instance without to_s method>"
+    _ -> replyM_ $ VString $ mkStringLiteral $ show v
 
 call _ = replyM_ $ VError $ Err "RunTimeError" "Function call on an object that does not act like a function" []
 
 puts :: [Value] -> EvalM ()
 puts vals = do
   vals' <- mapM (\v -> eval (Call (EValue v) "to_s" [])) vals
-  let strs = map (\(VString s) -> string s) vals'   
-  liftIO $ mapM_ putStrLn strs 
+  let strs = map (\(VString s) -> string s) vals'
+  liftIO $ mapM_ putStrLn strs
   replyM_ VNil
 
 cls [] = gets (klass . self) >>= (replyM_ . VObject)

@@ -67,7 +67,7 @@ runEvalM e c = do
   r <- try $ runExceptT $ runStateT e c
   case r of
     Right x -> return x
-    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) [] 
+    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) []
 
 -- |Turns an expression into a value, potentially performing
 --  side effects along the way.
@@ -118,9 +118,8 @@ eval (Index expr args) = do
     (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
 
-eval (Apply var args vis) = do
-  (fn, arity) <- fnFromVar var vis
-  (fmap responseToValue) $ extract $ apply fn arity args
+eval ast@(Apply _ _ _) = do
+  (fmap responseToValue) $ extract $ evalT ast
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
@@ -150,7 +149,7 @@ eval (EClass n super exp) = do
 
 eval (Module n exp) = do
   mdl <- eval (EVar n)
-  case mdl of 
+  case mdl of
     VObject (Pid pid) -> sendM pid (Eval exp) >> return mdl
     _ -> buildModule n exp
 
@@ -203,8 +202,24 @@ evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
 --   that are suseptable to tail recursion are reimplimented here.
 evalT ::  Exp -> EvalM ()
 evalT (Apply var args vis) = do
-  (fn, arity) <- fnFromVar var vis
-  apply fn arity args
+  (fn, arity, args') <- let
+                          handler (Err "NotFoundError" msg []) =
+                            case var of
+                              Var{name = str, scope =[]} -> do
+                                (f,a) <- fnFromVar (simple "method_missing") Public
+                                return (f,a,((EAtom str):args))
+                              _ -> do
+                                slf <- gets self
+                                throwError $ Err "MethodMissing" msg [VObject slf]
+                          handler err = throwError err
+
+                          find = do
+                            (f,a) <- fnFromVar var vis
+                            return (f,a,args)
+
+                        in
+                          find `catchError` handler
+  apply fn arity args'
 evalT (Call expr msg args) = do
   val <- eval expr
   r <- valToObj val
@@ -247,17 +262,8 @@ fnFromVar var vis = do
     Public -> lookupMethod $ top var
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
-    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals 
+    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals
     VNil  -> throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
-    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
-
-fnForMethod :: String -> EvalM(Fn, Arity)
-fnForMethod str = do
-  val <- lookupMethod str
-  case val of
-    VFunction{function=fn, arity=arity} -> return (fn, arity)
-    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up method" ++ show str ++ ")") vals 
-    VNil  -> throwError $ Err "NotFoundError" ("Method not found: " ++ show str) []
     val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
 
 -- | The inner workings of Class creation
