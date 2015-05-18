@@ -258,8 +258,8 @@ argumentList True = argumentList False <|> openList
 functionBlockExtend :: Exp -> TParser Exp
 functionBlockExtend (Call exp str xs) = functionBlock >>= (\x -> return $ Call exp str (xs `appendList` x))
 functionBlockExtend (Send exp str xs) = functionBlock >>= (\x -> return $ Send exp str (xs `appendList` x))
-functionBlockExtend (Apply var xs) = functionBlock >>= (\x -> return $ Apply var (xs `appendList` x))
-functionBlockExtend (EVar var) = functionBlock >>= (\x -> return $ Apply var [x])
+functionBlockExtend (Apply var xs vis) = functionBlock >>= (\x -> return $ Apply var (xs `appendList` x) vis)
+functionBlockExtend (EVar var) = functionBlock >>= (\x -> return $ Apply var [x] Private)
 functionBlockExtend _ = parserFail "Could not add a block to this expression"
 
 appendList :: [a] -> a -> [a]
@@ -336,15 +336,15 @@ var = do
     let global = pscope [""]
     selfP <|> local <|> global <?> "variable expression"
 
--- | Tries to turn a Var into function application.  Returns the and
---   expression for the Var when there is no paramenter.  Look here to parse
---   paren-less function application (TODO)
+-- | Tries to turn a Var into function application.  Returns the
+--   expression for the Var when there is no paramenter.  Note that
+--   this is a Private visibility call as there is no reciever.
 --
 --   __Notice__: Unlike all other extending parsers, 'args' cannot fail.  It is
 --   included in the set of basic parsers.
 args :: Bool-> Var -> TParser Exp
 args p var =
-  (argumentList p >>= (\args->return (Apply var args))) <|> return (EVar var)
+  (argumentList p >>= (\args->return (Apply var args Private))) <|> return (EVar var)
 
 
 unaryOperator :: TParser Exp

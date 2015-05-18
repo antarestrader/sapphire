@@ -44,6 +44,11 @@ responderObject obj msg =
       case (directCVars str obj) of
         Just v  -> C.reply (snd msg) (Response v) >> return obj
 	Nothing -> C.reply (snd msg) NothingFound >> return obj
+    Search Methods str -> do
+      r <- run obj (snd msg) (const Nothing) (searchMethods str obj)
+      case r of
+        Just v  -> C.reply (snd msg) (Response v) >> return obj
+        Nothing ->  C.reply (snd msg) NothingFound >> return obj
     Search ObjectGraph str -> do
       r <-  run obj (snd msg) (const Nothing) (searchObject str (MO undefined obj)) 
       case r of
@@ -94,7 +99,7 @@ run obj cont fixerror action = do
 call :: Object -> Var -> [Value] -> Continuation -> IO Object
 call obj var args cont = do
   let context =  newContext obj cont responderObject
-  result <- runEvalM (evalT $ Apply var $ map EValue args) context  
+  result <- runEvalM (evalT $ Apply var (map EValue args) Public) context 
   case result of
     Left  err -> (C.reply cont (Response $ VError err)) >> return obj
     Right ((),context) -> return (self context) 

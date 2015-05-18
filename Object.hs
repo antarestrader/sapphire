@@ -109,7 +109,7 @@ data Message =
   | Terminate
 
 
-data SearchIn = IVars | CVars | ObjectGraph | ClassGraph
+data SearchIn = IVars | CVars | ObjectGraph | ClassGraph | Methods
 
 data Response = Response Value | NothingFound | Error (Err Value)
 

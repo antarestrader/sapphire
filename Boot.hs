@@ -7,6 +7,7 @@
 module Boot (boot) where
 
 import Var
+import AST
 import Builtin.Object
 import Builtin.Class
 import Context
@@ -30,10 +31,10 @@ boot = do
   let (Pid obj_pid) = object
   cls@(Pid cls_pid) <- classClass object
   cont <- newContIO
-  send cont obj_pid (Execute (simple "setClass") [VObject cls])
-  send cont cls_pid (Execute (simple "setClass") [VObject cls])
-  send cont obj_pid (Execute (simple "setCVar")  [VAtom "Object", VObject object])
-  send cont obj_pid (Execute (simple "setCVar")  [VAtom "Class", VObject cls])
+  send cont obj_pid (Eval $ Apply (simple "setClass") [EValue $ VObject cls] Private)
+  send cont cls_pid (Eval $ Apply (simple "setClass") [EValue $ VObject cls] Private)
+  send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Object", EValue $ VObject object] Private)
+  send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Class", EValue $ VObject cls] Private)
 
   let self = Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
   context <- newContextIO self responderObject

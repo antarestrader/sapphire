@@ -54,7 +54,7 @@ repl c = do
     _  -> do
            result <- flip runEvalM c $ do
                      r <- evaluate l
-                     eval $ Apply (simple "puts") [EValue r]
+                     eval $ Apply (simple "puts") [EValue r] Private
                      return r
            case result of
              Left  err -> putStrLn (show err) >> repl c

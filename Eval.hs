@@ -111,7 +111,7 @@ eval (Call expr msg args) = do
                              handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
                              handler err = throwError err
                            in
-                             fnFromVar (simple msg) `catchError` handler
+                             fnForMethod msg `catchError` handler
         guardR  "Wrong number of arguments." $ checkArity arity $ length vals
         extract $ method vals -- proper tail calls here
       f $ VObject obj' -- update self
@@ -124,8 +124,8 @@ eval (Index expr args) = do
     (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
 
-eval (Apply var args) = do
-  (fn, arity) <- fnFromVar var
+eval (Apply var args vis) = do
+  (fn, arity) <- fnFromVar var vis
   guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
   (fmap responseToValue) $ extract $ fn vals -- extract impliments proper tail recursion
@@ -213,8 +213,8 @@ evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
 --   recursion.  Most cases are handled by calling back to eval, but those
 --   that are suseptable to tail recursion are reimplimented here.
 evalT ::  Exp -> EvalM ()
-evalT (Apply var args) = do
-  (fn, arity) <- fnFromVar var
+evalT (Apply var args vis) = do
+  (fn, arity) <- fnFromVar var vis
   guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
   fn vals
@@ -229,7 +229,7 @@ evalT (Call expr msg args) = do
                              handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
                              handler err = throwError err
                            in
-                             fnFromVar (simple msg) `catchError` handler
+                             fnForMethod  msg `catchError` handler
       guardR "Wrong number of arguments." $ checkArity arity $ length vals
       method vals
     -- TODO: put self back (see issue #28 on github)
@@ -251,13 +251,27 @@ evalT exp = eval exp >>= replyM_  -- General case
 -- When we encounter a non-function value, we create a temporary function
 -- which uses the "call" method.  By implimenting this method, any object
 -- can pretend to be a function.
-fnFromVar :: Var -> EvalM (Fn, Arity)
-fnFromVar var = do
-  MV _ val <- lookupVar var  -- TODO: Catch "NotFoundError" and impliment Method Missing
+fnFromVar :: Var -> Visibility-> EvalM (Fn, Arity)
+fnFromVar var vis = do
+  val <- case vis of
+    Private -> do
+      MV _ val' <- lookupVar var
+      return val'
+    Protected -> throwError $ Err "SystemError" "TODO: impliment protected methods" []
+    Public -> lookupMethod $ top var
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
     (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals 
     VNil  -> throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
+    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
+
+fnForMethod :: String -> EvalM(Fn, Arity)
+fnForMethod str = do
+  val <- lookupMethod str
+  case val of
+    VFunction{function=fn, arity=arity} -> return (fn, arity)
+    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up method" ++ show str ++ ")") vals 
+    VNil  -> throwError $ Err "NotFoundError" ("Method not found: " ++ show str) []
     val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
 
 -- | The inner workings of Class creation

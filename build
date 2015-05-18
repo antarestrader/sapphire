@@ -1,3 +1,4 @@
 #! /bin/sh
 
+touch Main.hs
 ghc -outputdir tmp Main.hs

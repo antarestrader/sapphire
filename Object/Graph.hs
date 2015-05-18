@@ -38,12 +38,14 @@ module Object.Graph (
   -- * Remote
   , remoteIVars
   , remoteCVars
+  , remoteMethods
   , remoteObject
   , remoteClass
 
   -- * Search
   , searchLocal
   , searchObject
+  , searchMethods
   , searchClass
   , searchModules
   , searchCVars
@@ -53,6 +55,7 @@ module Object.Graph (
   , lookupVar
   , lookupSelf
   , lookupIVar
+  , lookupMethod
 
   -- * Inserts
   , insertIVars
@@ -129,6 +132,9 @@ remoteIVars str p = dispatchM p (Search IVars str)
 remoteCVars :: String -> Process -> EvalM Response
 remoteCVars str p = dispatchM p (Search CVars str)
 
+remoteMethods :: String -> Process -> EvalM Response
+remoteMethods str p = dispatchM p (Search Methods str)
+
 remoteObject :: String -> Process -> EvalM Response
 remoteObject str p = dispatchM p (Search ObjectGraph str)
 
@@ -177,6 +183,13 @@ searchObject str (MO update obj) = runMaybeT $ msum $ map MaybeT [a,b,c]
         b = searchModules str (modules obj) >>= return . fmap mverror
         c = searchClass str (klass obj)  >>= return . fmap mverror
 
+searchMethods :: String -> Object -> EvalM(Maybe Value)
+searchMethods _ ROOT = return Nothing
+searchMethods str (Pid p) = responseToMaybe $ remoteMethods str p
+searchMethods str obj = runMaybeT $ msum $ map MaybeT [b,c]
+  where b = searchModules str (modules obj)
+        c = searchClass str (klass obj)
+
 searchClass :: String -> Object -> EvalM(Maybe Value)
 searchClass _ ROOT = return Nothing
 searchClass str (Pid p) = responseToMaybe $ remoteClass str p
@@ -193,7 +206,7 @@ searchCVars :: String -> Object -> EvalM(Maybe Value)
 searchCVars str ROOT = return Nothing
 searchCVars str obj@Object{} = throwError $ Err "GraphSearchError" "Tried to find class methods on an object that was not a class." [VObject obj]
 searchCVars str (Pid p) = responseToMaybe $ remoteCVars str p
-searchCVar str cls@Class{} = return $ directCVars str cls
+searchCVars str cls@Class{} = return $ directCVars str cls
 
 searchIVars :: String -> MutableObject -> EvalM(Maybe MutableValue)
 searchIVars str (MO _ ROOT) = return Nothing
@@ -254,6 +267,14 @@ lookupIVar str = do
   case directIVars str slf of 
     Nothing -> return $ MV (\val' -> modifySelf $ insertIVars str val') VNil
     Just v -> return $ MV (\val' -> modifySelf $ insertIVars str val') v
+
+lookupMethod :: String -> EvalM(Value)
+lookupMethod str = do
+  slf <- gets self
+  r <- searchMethods str slf
+  case r of
+    (Just v) -> return v
+    Nothing  -> throwError  $ Err "NotFoundError" str []
 
 insertIVars :: String -> Value -> Object -> Object
 insertIVars str val obj = obj{ivars = M.insert str val (ivars obj)}
