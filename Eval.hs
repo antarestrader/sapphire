@@ -102,20 +102,14 @@ eval (Assign lhs exp) = do
 eval (Call expr msg args) = do
   (MV f val) <- evalWithContext expr
   r <-  valToObj val
-  vals <- mapM eval args
   case r of
-    Pid pid -> (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
+    Pid pid -> do
+      vals <- mapM eval args
+      (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
-      (result, obj') <- with receiver $ do
-        (method, arity) <- let
-                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
-                             handler err = throwError err
-                           in
-                             fnForMethod msg `catchError` handler
-        guardR  "Wrong number of arguments." $ checkArity arity $ length vals
-        extract $ method vals -- proper tail calls here
+      (result, obj') <- with receiver $ eval (Apply (simple msg) args Public)
       f $ VObject obj' -- update self
-      return $ responseToValue result
+      return result
 
 eval (Index expr args) = do
   val <- eval expr
@@ -126,17 +120,12 @@ eval (Index expr args) = do
 
 eval (Apply var args vis) = do
   (fn, arity) <- fnFromVar var vis
-  guardR "Wrong number of arguments." $ checkArity arity $ length args
-  vals <- mapM eval args
-  (fmap responseToValue) $ extract $ fn vals -- extract impliments proper tail recursion
+  (fmap responseToValue) $ extract $ apply fn arity args
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
   case fn of
-    VFunction fn' arity -> do
-       guardR "Wrong number of arguments." $ checkArity arity $ length args
-       vals <- mapM eval args
-       (fmap responseToValue) $ extract $ fn' vals
+    VFunction fn' arity -> (fmap responseToValue) $ extract $ apply fn' arity args
     obj -> eval (Call (EValue obj) "call" args)
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
@@ -215,23 +204,15 @@ evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
 evalT ::  Exp -> EvalM ()
 evalT (Apply var args vis) = do
   (fn, arity) <- fnFromVar var vis
-  guardR "Wrong number of arguments." $ checkArity arity $ length args
-  vals <- mapM eval args
-  fn vals
+  apply fn arity args
 evalT (Call expr msg args) = do
   val <- eval expr
   r <- valToObj val
-  vals <- mapM eval args
   case r of
-    Pid pid -> tailM pid (Execute (simple msg) vals)
-    receiver -> fmap fst $ with receiver $ do
-      (method, arity) <- let
-                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
-                             handler err = throwError err
-                           in
-                             fnForMethod  msg `catchError` handler
-      guardR "Wrong number of arguments." $ checkArity arity $ length vals
-      method vals
+    Pid pid -> do
+      vals <- mapM eval args
+      tailM pid (Execute (simple msg) vals)
+    receiver -> fmap fst $ with receiver $ evalT (Apply (simple msg) args Public)
     -- TODO: put self back (see issue #28 on github)
 evalT (Block exps file) = do
   insertLocalM "__FILE__" $ VString $ mkStringLiteral file
@@ -240,6 +221,11 @@ evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
 evalT exp = eval exp >>= replyM_  -- General case
+
+apply fn arity args = do
+  guardR "Wrong number of arguments." $ checkArity arity $ length args
+  vals <- mapM eval args
+  fn vals
 
 -- | Given a Var find or create a function to call
 --
