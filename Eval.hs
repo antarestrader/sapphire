@@ -141,6 +141,25 @@ eval (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
 
+eval (EClass Self _ exp) = do
+  -- TODO: check to see if we can reopen a local module
+  VObject superClass <- eval (EVar $ simple "Object")
+  VObject clsClass   <- eval (EVar $ simple "Module")
+  let mdl = Class
+          { ivars = M.empty
+	  , klass = clsClass
+	  , modules=[]
+	  , process = Nothing
+	  , super = superClass
+	  , cvars = M.empty
+          , cmodules = []
+	  , properName = "*"
+	  }
+  (val,mdl')<- with mdl $ eval exp
+  modifySelf (\slf-> slf{modules = (mdl':(modules slf))})
+  return val
+
+
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
   case cls of
