@@ -34,6 +34,7 @@ bootstrap = M.fromList [
        , ("to_s"    , VFunction to_s (0, Just 0 ))
        , ("include" , VFunction includeFn (1, Nothing))
        , ("cmodules", VFunction cmodulesFn (0, Just 0 ))
+       , ("instance_methods", VFunction instanceMethodsFn (0, Just 1 ))
        ]
 
 setCVar [VAtom n,val] = do
@@ -91,5 +92,10 @@ cmodulesFn :: [Value] -> EvalM()
 cmodulesFn _ = do
   slf <- gets self
   replyM_ $ VArray $ fromList $ map VObject $ cmodules slf 
+
+instanceMethodsFn  :: [Value] -> EvalM()
+instanceMethodsFn _ = do -- TODO: for true values move through inheritance chain
+   slf <- gets self
+   replyM_ $ VArray $ fromList $ map VAtom $ M.keys $ cvars slf
   
 
