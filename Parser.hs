@@ -475,10 +475,11 @@ moduleParser = do
 defParser :: TParser Exp
 defParser = do
   keyword "def"
+  astNode <- (keyword "self" >> tdot >> return DefSelf) <|> return Def
   n <- identifier <|> stringT
   ps <- option [] $ paramList
   exp <- block
-  return $ Def n ps exp
+  return $ astNode n ps exp
 
 defineParser :: TParser Exp
 defineParser = do

@@ -128,6 +128,13 @@ eval (ApplyFn fnExp args) = do
     obj -> eval (Call (EValue obj) "call" args)
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
+
+eval (DefSelf n ps exp) = do
+  (mdl,fn) <- localModule
+  (val,mdl') <- with mdl $ eval $  Assign (LCVar n) (Lambda ps exp)
+  fn mdl'
+  return val
+
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
 eval (Block exps file) = do
@@ -142,23 +149,10 @@ eval (If pred cons alt) = do
   if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
 
 eval (EClass Self _ exp) = do
-  -- TODO: check to see if we can reopen a local module
-  VObject superClass <- eval (EVar $ simple "Object")
-  VObject clsClass   <- eval (EVar $ simple "Module")
-  let mdl = Class
-          { ivars = M.empty
-	  , klass = clsClass
-	  , modules=[]
-	  , process = Nothing
-	  , super = superClass
-	  , cvars = M.empty
-          , cmodules = []
-	  , properName = "*"
-	  }
+  (mdl, update) <- localModule
   (val,mdl')<- with mdl $ eval exp
-  modifySelf (\slf-> slf{modules = (mdl':(modules slf))})
+  update mdl'
   return val
-
 
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
@@ -313,10 +307,21 @@ buildClass n super exp = do
 
   return $ VObject $ Pid pid
 
-buildModule n exp = do
+localModule :: EvalM (Object, (Object -> EvalM()))
+localModule = do
+  slf <- gets self
+  case (modules slf) of
+    (mdl:_) | (properName mdl == "*") -> return (mdl, fn)
+        where fn mdl' = modifySelf (\slf-> slf{modules = (mdl':(tail $ modules slf))})
+    _ -> do
+      mdl <- newModule "*"
+      let fn mdl' = modifySelf (\slf-> slf{modules = (mdl':(modules slf))})
+      return (mdl, fn)
+
+newModule str = do
   VObject superClass <- eval (EVar $ simple "Object")
   VObject clsClass   <- eval (EVar $ simple "Module")
-  let mdl = Class
+  return $ Class
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
@@ -324,8 +329,11 @@ buildModule n exp = do
 	  , super = superClass
 	  , cvars = M.empty
           , cmodules = []
-	  , properName = name n
+	  , properName = str
 	  }
+
+buildModule n exp = do
+  mdl <- newModule $ name n
   Pid pid <- liftIO $ spawn mdl
   sendM pid $ Eval exp
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module

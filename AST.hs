@@ -30,6 +30,7 @@ data Exp =
   | Index Exp [Exp] -- ^ an expression followed by an index (foo[3])
   | Lambda [Parameter] Exp -- ^ an anonymous function declairation
   | Def String [Parameter] Exp -- ^ a method declairartion
+  | DefSelf String [Parameter] Exp -- ^ a method declairation of the form `def self.xxx`
   | Apply Var [Exp] Visibility -- ^ application of the actual params [Exp] to the function found at var
   | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
   | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
