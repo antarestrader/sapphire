@@ -3,6 +3,7 @@ module Builtin.Object where
 import Builtin.Utils hiding (call)
 import Builtin.Bindings (initialize)
 import Object
+import qualified Array as A
 import AST
 import Err
 import Eval
@@ -39,6 +40,7 @@ bootstrapset = M.fromList [
        , ("eval",   VFunction evalStr  (1,Just 1))
        , ("load",   VFunction loadFn   (1,Just 1))
        , ("extend", VFunction extendFn (1, Nothing))
+       , ("modules",VFunction modulesFn  (0,Just 0))
        , ("method_missing", VFunction methodMissing (1, Nothing))
        ]
 
@@ -114,3 +116,7 @@ extendFn mdls = do
       o <- valToObj x
       loop (obj{modules = (o:(modules obj))}) xs -- assumes that self is never a PID
 
+modulesFn :: [Value] -> EvalM()
+modulesFn _ = do
+  slf <- gets self
+  replyM_ $ VArray $ A.fromList $ map VObject $ modules slf
