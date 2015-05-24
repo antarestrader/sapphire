@@ -5,6 +5,7 @@ import Control.Monad.State
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 import qualified Array as A
+import Data.Foldable
 import Err
 import Hash
 import Object
@@ -44,7 +45,7 @@ buildHashFromList kvs = do
     f (tk,tv) = do
       k <- valueToHKeyM tk
       let v = HValue {trueKey = tk, trueValue = tv}
-      return (k,v) 
+      return (k,v)
 
 hashClass :: EvalM Object
 hashClass = buildClass "Hash" bootstrap
@@ -55,7 +56,9 @@ bootstrap = M.fromList [
     , ("indexed", VFunction indexed (1,Just 1))
     , ("indexAssign", VFunction indexAssign (2,Just 2))
     , ("to_list", VFunction to_list (0,Just 0))
+    , ("to_hash", VFunction (\_ -> replyM_ =<< innerValue) (0,Just 0))
     , ("insert" , VFunction insert (2,Just 2))
+    , ("inject" , VFunction injectFn (2, Just 2))
     ]
 
 keys :: [Value] -> EvalM ()
@@ -86,7 +89,7 @@ indexed [tk] = do
           tv <- eval (ApplyFn (EValue d) [EValue tk])
           replyM_ tv
           updateInnerValue $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
-        _ -> replyM_ d  
+        _ -> replyM_ d
 
 indexAssign :: [Value] -> EvalM ()
 indexAssign [tk,tv] = do
@@ -101,3 +104,21 @@ insert [tk,tv] = do
   (VHash (hash@Hash{h=hashmap})) <- innerValue
   k <- valueToHKeyM tk
   replyM_ $ VHash $ hash{h=H.insert k (HValue{trueKey=tk, trueValue=tv}) hashmap}
+
+injectFn :: [Value] -> EvalM()
+injectFn [init, fn] = do
+  Hash {h = hash} <- toHash =<< innerValue
+  replyM_ =<< foldlM fn' init hash
+    where
+      fn' :: Value -> HValue -> EvalM Value
+      fn' acc (HValue{trueKey=k,trueValue=v})
+        = eval (ApplyFn (EValue fn)  [(EValue acc),(EValue k),(EValue v)])
+
+toHash :: Value -> EvalM Hash
+toHash val = loop val 12
+  where
+    loop (VHash h) _ = return h
+    loop _ 0 =  throwError $ Err "RunTimeError" "Value refuses to be converted to a Hash" [val]
+    loop val' n = do
+      val'' <- eval (Call (EValue val') "to_hash" [])
+      loop val'' (n-1)

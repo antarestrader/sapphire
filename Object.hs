@@ -39,6 +39,10 @@ vnil = VNil
 verror :: String -> Value
 verror = VError . strMsg
 
+vbool :: Bool -> Value
+vbool True  = VTrue
+vbool False = VFalse
+
 instance Eq Value where
   (VInt i) == (VInt j) = i == j
   (VFloat f) == (VFloat g) = f == g

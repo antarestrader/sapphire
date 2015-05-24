@@ -1,0 +1,21 @@
+# Hash.sap - Part of the Sapphire base library
+# copyright 2015 John F. Miller
+
+class Hash
+  # Built-in methods
+    indexAssign, indexed, insert, keys, values, to_list
+  # planned methods
+    length, empty, merge
+
+
+  def "[]" (key)
+    indexed key
+
+  def "[]=" (key, value)
+    indexAssign(key,value)
+    
+  def to_arr
+    inject([]) do |acc, k, v|
+      acc.push([k,v])
+        
+#end class Hash

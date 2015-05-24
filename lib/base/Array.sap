@@ -23,3 +23,6 @@ class Array
   def include?(v)
     inject(false) do |acc,val|
       acc || v == val
+
+  def "+" (other)
+    concat(other)
