@@ -8,9 +8,8 @@ stable program release, but rather a record of thoughts and ideas recorded as
 Sapphire is constructed.
 
 This file is **not** covered under the code or documentation licences.  This
-file, Copyright &copy; 2013, 2014 by John F. Miller, is licenced under is licensed
-under a [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
-International License][licence].
+file, Copyright &copy; 2013, 2014, 2015 by John F. Miller, is licenced under 
+a [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License][licence].
 
 <a rel="license" href="http://creativecommons.org/licenses/by-nc-nd/4.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-nd/4.0/88x31.png" /></a>
 
@@ -47,7 +46,7 @@ defined.  I think that as the object model becomes more sophisticated this will
 work itself out.
 
 For the time being however, I can now define functions using lambda. So long as
-the are pure with respect to their context, the work as expected.
+the are pure with respect to their context, they work as expected.
 
 My idea is to have all contexts be objects with pure functions given new
 anonymous objects while methods get self as the object.  There is still the
@@ -83,7 +82,7 @@ This is all tied in with the question of how Context will work as well. The
 concurrency model depends on the fact that every value in Sapphire belongs to an
 Object. (Or is in a local scope that may only leave the local scope by being
 made part of an Object.) Values may only be manipulated (read and written) by
-the Object that contains them. If a function the closes over Object `A` is called in
+the Object that contains them. If a function that closes over Object `A` is called in
 the context of Object `B` *and* that function is not Value Pure it must run in
 the context of Object `A`.  How do I make that context switch happen?
 
@@ -478,10 +477,10 @@ Should this even be possible?
 
 ## May 16, 2015
 
-## Explain the Code
+### Explain the Code
 
 At some point it will become necessary for someone other thne me to understand
-how this code base works.  I hove though about a set or articles of perhaps
+how this code base works.  I have though about a set or articles of perhaps
 videos that would take a prospective coder through the code explaining some of
 the decissions that lead to its current form.
 
@@ -491,6 +490,58 @@ from `Main.main` or 2) begining with a source file and following it through
 exicution. One could also take the elevator down to the most interesing parts
 and work back to the surface. That is start with `Object` or `Concurrent` and work
 outword.
+
+## May 27, 2015
+
+I have gotten stuck trying to impliment `super`.  The issues is how to keep
+track of why and how a method was called. At the point that a method's code is
+invoked, it is just a function excicuted with a context containint the correct
+version of `self`.  The function is actually created with the same eval path as
+an anonomous function.  In particular, there is no record of what method name
+was used or what class / module that function lived in.
+
+The goal in the next set of changes is add enough information to `Context` (the
+state in the EvalM monad) that the interpreter can figure out where to go next
+to look for `super`.
+
+There are two challenges here, neither of which is faced by Ruby. First
+Sapphire admits proper tail calls which makes it much more difficult to undo
+changes to the context at the end of the function.  We cannot simply pop a
+pointer off the stack at the end of the function because the function may not
+actually ever reach the end.  It may instead continue in some other function.
+
+The second issue is how to find the "next higher" version of the function.  It
+is very difficult to mark our spot in the Object Graph and even harder to return
+to it.  In a more conventional implimentation in an single-threaded imparitive
+language, we would jsut store a pointer to the right module/class.  We do not
+have the luxury of pointers, and we cannot describer where we are becasue the
+shape of the tree might change while our function is executing.  It might even
+change because our function is executing.
+
+My current track to solving this problem is to give every Class (as in the
+Haskell Constructor for Object) a unique ID. This of course requires some global
+source of ID's (random number, monotonically increasing integer, UUIDs) which
+inturn implies some use of the IO monad. One thing to realize is that PIDs are
+unique are instances of `Eq` so they can be used to identify a named class or
+module.  However, we have just contructed anonimous modules which do not have in
+independent PID nor even a unique name.
+
+The thought then occurs to change the process field to `Either Int PID` and
+perhaps rename it to something like identity.  Then there is the simple matter
+of grabbing some form of uninque Int (or to prevent overflow Integer). This
+value could then be stuck into Context and on super eval could run up the Object
+Graph looking for a module or class with that Identity and move on to the next
+occurance.
+
+This solves the question of where to look but not the question of
+what to look for.  The name of the current method also need to be in the
+Context. Setting these correctly and not having them bleed over is going to
+require an intense review of where contexts are created and how they persist
+accross method calls.  It may be necessary toi ensure that a new Context is
+derived for each funcion call and that it is discarded at the end of the call.
+This *may* be how things work already, but I will need to carefully read my code
+to find out.
+
 
 [alex-basic]: http://www.haskell.org/alex/doc/html/basic-api.html
 [alex-wrapper]: http://www.haskell.org/alex/doc/html/wrappers.html
