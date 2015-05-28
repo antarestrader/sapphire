@@ -14,7 +14,10 @@ import Control.Monad.IO.Class
 import System.Directory
 
 directoryClass :: EvalM Object
-directoryClass = buildClassEx "Directory" M.empty bootstrap
+directoryClass = do
+  cls <- buildClass "Directory" M.empty
+  includeModule cls bootstrap
+
 
 bootstrap = M.fromList [
          ("canonical", VFunction canonical (1, Nothing))

@@ -8,7 +8,7 @@ import {-# SOURCE #-} Eval
 import Object
 import AST
 import Err
-import Context (self, replyM_)
+import Context (self, replyM_, sendM)
 import Object.Graph (lookupIVar, MutableValue(..))
 import {-# SOURCE #-} Object.Spawn (spawn)
 import Var (simple)
@@ -28,7 +28,10 @@ updateInnerValue val = do
 
 buildClassEx :: String -> M.Map String Value -> M.Map String Value -> EvalM Object
 buildClassEx name bootstrap clsBoot = do
-  VObject superClass <- eval ( EVar $ simple "Object")
+  sc <- eval ( EVar $ simple "Object")
+  superClass <-  case sc of
+    VObject s -> return s
+    val -> throwError $ Err "SystemError" "`Object` not found" [val]
   VObject clsClass   <- eval ( EVar $ simple "Class")
   let cls =  Class
           { ivars = clsBoot
@@ -44,6 +47,27 @@ buildClassEx name bootstrap clsBoot = do
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
   eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
   return pid
+
+includeModule :: Object -> M.Map String Value -> EvalM Object
+includeModule obj methods = do
+  sc <- eval ( EVar $ simple "Object")
+  superClass <-  case sc of
+    VObject s -> return s
+    val -> throwError $ Err "SystemError" "`Object` not found" [val]
+  VObject clsClass   <- eval ( EVar $ simple "Module")
+  let mdl = Class
+          { ivars = M.empty
+          , klass = clsClass
+          , modules = []
+          , process = Nothing
+          , super = superClass
+          , cvars = methods
+          , cmodules = []
+          , properName = "*"
+          }
+  case obj of
+    (Pid p) -> (sendM p $ PushModule $ VObject mdl) >> return obj
+    o -> return o{modules = (mdl:(modules o))}
 
 buildClass :: String -> M.Map String Value -> EvalM Object
 buildClass a b = buildClassEx a b M.empty  

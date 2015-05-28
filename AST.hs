@@ -30,7 +30,8 @@ data Exp =
   | Index Exp [Exp] -- ^ an expression followed by an index (foo[3])
   | Lambda [Parameter] Exp -- ^ an anonymous function declairation
   | Def String [Parameter] Exp -- ^ a method declairartion
-  | Apply Var [Exp] -- ^ application of the actual params [Exp] to the function found at var
+  | DefSelf String [Parameter] Exp -- ^ a method declairation of the form `def self.xxx`
+  | Apply Var [Exp] Visibility -- ^ application of the actual params [Exp] to the function found at var
   | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
   | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
   | Send Exp String [Exp] -- ^ concurrent method invocation (foo->bar(x))
@@ -65,6 +66,8 @@ data Parameter =
   | Default String Exp
   | VarArg String
     deriving (Show)
+
+data Visibility = Public | Private | Protected deriving (Show, Eq)
 
 getParamName (Param n) = n
 getParamName (VarArg n) = n

@@ -54,7 +54,7 @@ concatFn (s:vals) = do
 toString' :: Value -> EvalM Value
 toString' val = loop val 12
   where
-    loop s@(VString str) _ = return s 
+    loop s@(VString str) _ = return s
     loop _ 0 = throwError $ Err "RunTimeError" "Value refuses to be converted to a String" [val]
     loop val' n = do
       val'' <- eval (Call (EValue val') "to_s" [])

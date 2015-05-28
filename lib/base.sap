@@ -26,14 +26,23 @@ class Object
 
   def nil?
     false
-
+  def is_function?
+    false
   def "!="(b)
     (self == b).not
 #end class Object
 
 require "lib/base/Number.sap"
+require "lib/base/Hash.sap"
+
+class Function
+  def is_function?
+    true
 
 class NilClass
+  def to_s
+    "nil"
+
   def not
     true
 

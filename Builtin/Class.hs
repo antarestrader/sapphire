@@ -34,6 +34,7 @@ bootstrap = M.fromList [
        , ("to_s"    , VFunction to_s (0, Just 0 ))
        , ("include" , VFunction includeFn (1, Nothing))
        , ("cmodules", VFunction cmodulesFn (0, Just 0 ))
+       , ("instance_methods", VFunction instanceMethodsFn (0, Just 1 ))
        ]
 
 setCVar [VAtom n,val] = do
@@ -42,9 +43,15 @@ setCVar [VAtom n,val] = do
 
 new [] = do
   slf <- gets self
+  let slf' = case slf of
+               pid@(Pid _) -> pid
+               Class{ process = Just pid } -> Pid pid
+               Class{ process = Nothing }  -> slf
+               _ -> error "trying to make instantiate a regular object.  What would that even mean?"
+
   let obj = VObject $ Object {
       ivars = M.empty
-    , klass = slf
+    , klass = slf'
     , modules = []
     , process = Nothing
     }
@@ -85,5 +92,10 @@ cmodulesFn :: [Value] -> EvalM()
 cmodulesFn _ = do
   slf <- gets self
   replyM_ $ VArray $ fromList $ map VObject $ cmodules slf 
+
+instanceMethodsFn  :: [Value] -> EvalM()
+instanceMethodsFn _ = do -- TODO: for true values move through inheritance chain
+   slf <- gets self
+   replyM_ $ VArray $ fromList $ map VAtom $ M.keys $ cvars slf
   
 

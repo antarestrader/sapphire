@@ -7,6 +7,7 @@ import AST
 import Err
 import Var
 import Context
+import Builtin.Module
 import Builtin.Atom
 import Builtin.Array
 import Builtin.Hash
@@ -21,6 +22,7 @@ import Control.Monad.Except
 
 initialize :: [Value] -> EvalM ()
 initialize _ = do
+  moduleClass
   arrayClass
   hashClass
   integerClass

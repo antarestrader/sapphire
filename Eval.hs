@@ -67,7 +67,7 @@ runEvalM e c = do
   r <- try $ runExceptT $ runStateT e c
   case r of
     Right x -> return x
-    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) [] 
+    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) []
 
 -- |Turns an expression into a value, potentially performing
 --  side effects along the way.
@@ -102,20 +102,14 @@ eval (Assign lhs exp) = do
 eval (Call expr msg args) = do
   (MV f val) <- evalWithContext expr
   r <-  valToObj val
-  vals <- mapM eval args
   case r of
-    Pid pid -> (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
+    Pid pid -> do
+      vals <- mapM eval args
+      (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
-      (result, obj') <- with receiver $ do
-        (method, arity) <- let
-                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
-                             handler err = throwError err
-                           in
-                             fnFromVar (simple msg) `catchError` handler
-        guardR  "Wrong number of arguments." $ checkArity arity $ length vals
-        extract $ method vals -- proper tail calls here
+      (result, obj') <- with receiver $ eval (Apply (simple msg) args Public)
       f $ VObject obj' -- update self
-      return $ responseToValue result
+      return result
 
 eval (Index expr args) = do
   val <- eval expr
@@ -124,22 +118,23 @@ eval (Index expr args) = do
     (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
 
-eval (Apply var args) = do
-  (fn, arity) <- fnFromVar var
-  guardR "Wrong number of arguments." $ checkArity arity $ length args
-  vals <- mapM eval args
-  (fmap responseToValue) $ extract $ fn vals -- extract impliments proper tail recursion
+eval ast@(Apply _ _ _) = do
+  (fmap responseToValue) $ extract $ evalT ast
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
   case fn of
-    VFunction fn' arity -> do
-       guardR "Wrong number of arguments." $ checkArity arity $ length args
-       vals <- mapM eval args
-       (fmap responseToValue) $ extract $ fn' vals
+    VFunction fn' arity -> (fmap responseToValue) $ extract $ apply fn' arity args
     obj -> eval (Call (EValue obj) "call" args)
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
+
+eval (DefSelf n ps exp) = do
+  (mdl,fn) <- localModule
+  (val,mdl') <- with mdl $ eval $  Assign (LCVar n) (Lambda ps exp)
+  fn mdl'
+  return val
+
 eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
 eval (Block exps file) = do
@@ -153,6 +148,12 @@ eval (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
 
+eval (EClass Self _ exp) = do
+  (mdl, update) <- localModule
+  (val,mdl')<- with mdl $ eval exp
+  update mdl'
+  return val
+
 eval (EClass n super exp) = do
   cls <- eval (EVar n)
   case cls of
@@ -161,7 +162,7 @@ eval (EClass n super exp) = do
 
 eval (Module n exp) = do
   mdl <- eval (EVar n)
-  case mdl of 
+  case mdl of
     VObject (Pid pid) -> sendM pid (Eval exp) >> return mdl
     _ -> buildModule n exp
 
@@ -213,25 +214,33 @@ evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
 --   recursion.  Most cases are handled by calling back to eval, but those
 --   that are suseptable to tail recursion are reimplimented here.
 evalT ::  Exp -> EvalM ()
-evalT (Apply var args) = do
-  (fn, arity) <- fnFromVar var
-  guardR "Wrong number of arguments." $ checkArity arity $ length args
-  vals <- mapM eval args
-  fn vals
+evalT (Apply var args vis) = do
+  (fn, arity, args') <- let
+                          handler (Err "NotFoundError" msg []) =
+                            case var of
+                              Var{name = str, scope =[]} -> do
+                                (f,a) <- fnFromVar (simple "method_missing") Public
+                                return (f,a,((EAtom str):args))
+                              _ -> do
+                                slf <- gets self
+                                throwError $ Err "MethodMissing" msg [VObject slf]
+                          handler err = throwError err
+
+                          find = do
+                            (f,a) <- fnFromVar var vis
+                            return (f,a,args)
+
+                        in
+                          find `catchError` handler
+  apply fn arity args'
 evalT (Call expr msg args) = do
   val <- eval expr
   r <- valToObj val
-  vals <- mapM eval args
   case r of
-    Pid pid -> tailM pid (Execute (simple msg) vals)
-    receiver -> fmap fst $ with receiver $ do
-      (method, arity) <- let
-                             handler (Err "NotFoundError" msg []) = throwError $ Err "MethodMissing" msg [val]
-                             handler err = throwError err
-                           in
-                             fnFromVar (simple msg) `catchError` handler
-      guardR "Wrong number of arguments." $ checkArity arity $ length vals
-      method vals
+    Pid pid -> do
+      vals <- mapM eval args
+      tailM pid (Execute (simple msg) vals)
+    receiver -> fmap fst $ with receiver $ evalT (Apply (simple msg) args Public)
     -- TODO: put self back (see issue #28 on github)
 evalT (Block exps file) = do
   insertLocalM "__FILE__" $ VString $ mkStringLiteral file
@@ -240,6 +249,11 @@ evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
 evalT exp = eval exp >>= replyM_  -- General case
+
+apply fn arity args = do
+  guardR "Wrong number of arguments." $ checkArity arity $ length args
+  vals <- mapM eval args
+  fn vals
 
 -- | Given a Var find or create a function to call
 --
@@ -251,12 +265,17 @@ evalT exp = eval exp >>= replyM_  -- General case
 -- When we encounter a non-function value, we create a temporary function
 -- which uses the "call" method.  By implimenting this method, any object
 -- can pretend to be a function.
-fnFromVar :: Var -> EvalM (Fn, Arity)
-fnFromVar var = do
-  MV _ val <- lookupVar var  -- TODO: Catch "NotFoundError" and impliment Method Missing
+fnFromVar :: Var -> Visibility-> EvalM (Fn, Arity)
+fnFromVar var vis = do
+  val <- case vis of
+    Private -> do
+      MV _ val' <- lookupVar var
+      return val'
+    Protected -> throwError $ Err "SystemError" "TODO: impliment protected methods" []
+    Public -> lookupMethod $ top var
   case val of
     VFunction{function=fn, arity=arity} -> return (fn, arity)
-    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals 
+    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals
     VNil  -> throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
     val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
 
@@ -288,10 +307,21 @@ buildClass n super exp = do
 
   return $ VObject $ Pid pid
 
-buildModule n exp = do
+localModule :: EvalM (Object, (Object -> EvalM()))
+localModule = do
+  slf <- gets self
+  case (modules slf) of
+    (mdl:_) | (properName mdl == "*") -> return (mdl, fn)
+        where fn mdl' = modifySelf (\slf-> slf{modules = (mdl':(tail $ modules slf))})
+    _ -> do
+      mdl <- newModule "*"
+      let fn mdl' = modifySelf (\slf-> slf{modules = (mdl':(modules slf))})
+      return (mdl, fn)
+
+newModule str = do
   VObject superClass <- eval (EVar $ simple "Object")
   VObject clsClass   <- eval (EVar $ simple "Module")
-  let mdl = Class
+  return $ Class
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
@@ -299,11 +329,18 @@ buildModule n exp = do
 	  , super = superClass
 	  , cvars = M.empty
           , cmodules = []
-	  , properName = name n
+	  , properName = str
 	  }
+
+buildModule n exp = do
+  mdl <- newModule $ name n
   Pid pid <- liftIO $ spawn mdl
   sendM pid $ Eval exp
   eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
+
+registerClass :: String -> Process -> EvalM Value
+registerClass n pid =
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom n, EValue $ VObject $ Pid pid] --fixme should be parent module
 
 -- | The internal working so making a function
 mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)
