@@ -16,12 +16,14 @@ import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Monad.Except
+import Control.Concurrent.STM
+import System.IO.Unsafe
 
 classClass object = spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
 	klass = ROOT,
 	modules = [],
-	process = Nothing,
+	process = unsafePerformIO newEmptyTMVarIO,
 	super = object,
 	cvars = bootstrap,
         cmodules = [],
@@ -41,27 +43,29 @@ setCVar [VAtom n,val] = do
   modifySelf $ insertCVars n val
   replyM_ val
 
+new :: [Value] -> EvalM ()
 new [] = do
   slf <- gets self
-  let slf' = case slf of
-               pid@(Pid _) -> pid
-               Class{ process = Just pid } -> Pid pid
-               Class{ process = Nothing }  -> slf
-               _ -> error "trying to make instantiate a regular object.  What would that even mean?"
-
+  tmvar <- liftIO $ newEmptyTMVarIO
+  slf' <- case slf of
+      pid@(Pid _) -> return pid
+      cls@Class{} -> do
+            pid <- liftIO $ atomically $ tryReadTMVar $ process cls
+            return $ maybe slf Pid pid
+      _ -> error "trying to make instantiate a regular object.  What would that even mean?"
   let obj = VObject $ Object {
       ivars = M.empty
     , klass = slf'
     , modules = []
-    , process = Nothing
+    , process =  tmvar
     }
   -- initialize here
   replyM_ obj
 
 spawnFn xs = do
-  (Response r) <- extract $ new xs 
+  (Response r) <- extract $ new xs
   r' <- valToObj r
-  obj <- liftIO $ spawn r' 
+  obj <- liftIO $ spawn r'
   replyM_ $ VObject obj
 
 to_s [] = do
@@ -91,11 +95,11 @@ includeFn mdls = do
 cmodulesFn :: [Value] -> EvalM()
 cmodulesFn _ = do
   slf <- gets self
-  replyM_ $ VArray $ fromList $ map VObject $ cmodules slf 
+  replyM_ $ VArray $ fromList $ map VObject $ cmodules slf
 
 instanceMethodsFn  :: [Value] -> EvalM()
 instanceMethodsFn _ = do -- TODO: for true values move through inheritance chain
    slf <- gets self
    replyM_ $ VArray $ fromList $ map VAtom $ M.keys $ cvars slf
-  
+
 

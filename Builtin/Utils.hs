@@ -4,6 +4,7 @@ import qualified Data.Map as M
 import Control.Monad.IO.Class
 import Control.Monad.State (gets)
 import Control.Monad.Except
+import Control.Concurrent.STM
 import {-# SOURCE #-} Eval
 import Object
 import AST
@@ -18,7 +19,7 @@ innerValue :: EvalM Value
 innerValue = do
   val <- lookupIVar "__value"
   case val of
-    (MV _ VNil) -> return $ VError $ Err "SystemError" "Internal Value at @__value was not found in self" [] 
+    (MV _ VNil) -> return $ VError $ Err "SystemError" "Internal Value at @__value was not found in self" []
     (MV _ v) -> return v
 
 updateInnerValue :: Value -> EvalM ()
@@ -33,11 +34,12 @@ buildClassEx name bootstrap clsBoot = do
     VObject s -> return s
     val -> throwError $ Err "SystemError" "`Object` not found" [val]
   VObject clsClass   <- eval ( EVar $ simple "Class")
+  tmvar <- liftIO $ newEmptyTMVarIO
   let cls =  Class
           { ivars = clsBoot
           , klass = clsClass
           , modules = []
-          , process = Nothing
+          , process = tmvar
           , super = superClass
           , cvars = bootstrap
           , cmodules = []
@@ -55,11 +57,12 @@ includeModule obj methods = do
     VObject s -> return s
     val -> throwError $ Err "SystemError" "`Object` not found" [val]
   VObject clsClass   <- eval ( EVar $ simple "Module")
+  tmvar <- liftIO $ newEmptyTMVarIO
   let mdl = Class
           { ivars = M.empty
           , klass = clsClass
           , modules = []
-          , process = Nothing
+          , process = tmvar
           , super = superClass
           , cvars = methods
           , cmodules = []
@@ -70,7 +73,7 @@ includeModule obj methods = do
     o -> return o{modules = (mdl:(modules o))}
 
 buildClass :: String -> M.Map String Value -> EvalM Object
-buildClass a b = buildClassEx a b M.empty  
+buildClass a b = buildClassEx a b M.empty
 
 mkBool :: Bool -> Value
 mkBool True = VTrue

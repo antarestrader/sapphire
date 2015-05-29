@@ -18,6 +18,7 @@ import String
 import Continuation (send, newContIO)
 import qualified Data.Map as M
 import System.Environment
+import Control.Concurrent.STM.TMVar
 
 
 baseLibrary = "lib/base.sap"
@@ -36,7 +37,8 @@ boot = do
   send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Object", EValue $ VObject object] Private)
   send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Class", EValue $ VObject cls] Private)
 
-  let self = Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=Nothing}
+  tmvar <- newEmptyTMVarIO
+  let self = Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=tmvar}
   context <- newContextIO self responderObject
   file <- getExecutablePath
   let context' = insertLocals "__FILE__"  (VString $ mkStringLiteral file) context

@@ -54,6 +54,7 @@ import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
+import Control.Concurrent.STM.TMVar
 
 -- | The moand in which Sapphire code runs.  It contains the Context, handles
 --   errors and allows for IO actions in the running program.
@@ -291,11 +292,12 @@ fnFromVar var vis = do
 buildClass n super exp = do
   VObject superClass <- eval (EVar $ maybe (simple "Object") id super)
   VObject clsClass <- eval (EVar $ simple "Class")
+  tmvar <- liftIO $ newEmptyTMVarIO
   let cls = Class
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
-	  , process = Nothing
+	  , process = tmvar
 	  , super = superClass
 	  , cvars = M.empty
           , cmodules = []
@@ -321,11 +323,12 @@ localModule = do
 newModule str = do
   VObject superClass <- eval (EVar $ simple "Object")
   VObject clsClass   <- eval (EVar $ simple "Module")
+  tmvar <- liftIO $ newEmptyTMVarIO
   return $ Class
           { ivars = M.empty
 	  , klass = clsClass
 	  , modules=[]
-	  , process = Nothing
+	  , process = tmvar
 	  , super = superClass
 	  , cvars = M.empty
           , cmodules = []

@@ -3,6 +3,8 @@
 module Object where
 
 import qualified Data.Map as M
+import Control.Concurrent.STM
+import Control.Concurrent
 
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} AST
@@ -87,12 +89,12 @@ data Object = Pid Process
             | Object { ivars   :: M.Map String Value  -- ^ instance variables
                      , klass   :: Object   -- ^ the class of this instance
 		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
-		     , process :: Maybe Process  -- ^ must be a PID pointing to this object
+		     , process :: TMVar Process  -- ^ must be a PID pointing to this object
 		     }
             | Class   {ivars   :: M.Map String Value  -- ^ instance variables
 	             , klass   :: Object   -- ^ the class of this instance (typicall Class)
 		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
-		     , process :: Maybe Process -- ^ must be a PID pointing to this object
+		     , process :: TMVar Process -- ^ must be a PID pointing to this object
 		     , super   :: Object   -- ^ the super-class of this class
 		     , cvars :: M.Map String Value     -- ^ instance methods
 		     , cmodules :: [Object]            -- ^ included class modules
@@ -100,6 +102,16 @@ data Object = Pid Process
 		                                       --   possibally empty for anonomous classes.
 		     }
             | ROOT
+
+instance Eq Object where
+  (Pid a) == (Pid b) = a == b
+  (Pid _) == _ = False
+  ROOT == ROOT = True
+  ROOT == _ = False
+  _ == (Pid _) = False
+  _ == ROOT = False
+  a == b = process a == process b
+
 
 data Message =
     Execute Var [Value] -- ^ may want ot make this strict in value
@@ -126,8 +138,12 @@ type Process = C.ProcessId Message Response
 type Replier = C.Replier Response
 type Responder = C.Responder Object Message Response
 
-thread :: Object -> String  -- for debugging purposes only
-thread (Pid pid) = show $ fst pid
-thread ROOT = "ROOT"
-thread obj | isJust (process obj) = show $ fst $ fromJust $ process obj
-thread _ = "unkonwn"
+thread :: Object -> IO String  -- for debugging purposes only
+thread (Pid pid) = return $ show $ fst pid
+thread ROOT = return "ROOT"
+thread obj = do
+  pro <- atomically $ tryTakeTMVar $ process obj
+  case pro of
+    Nothing -> myThreadId >>= return . show
+    Just pid -> return $ show $ fst pid
+

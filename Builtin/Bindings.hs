@@ -1,5 +1,5 @@
 module Builtin.Bindings
-  (bindPrimitiveObject, initialize) 
+  (bindPrimitiveObject, initialize)
 where
 
 import {-# SOURCE #-} Eval
@@ -19,6 +19,8 @@ import Builtin.String
 import Object
 import qualified Data.Map as M
 import Control.Monad.Except
+import Control.Concurrent.STM.TMVar
+import System.IO.Unsafe
 
 initialize :: [Value] -> EvalM ()
 initialize _ = do
@@ -35,10 +37,10 @@ initialize _ = do
 
 bindPrimitiveObject ::  Value -> EvalM Object
 bindPrimitiveObject val@(VInt _) = do
-  cls <- getPrimClass "Integer" 
+  cls <- getPrimClass "Integer"
   return $ buildPrimInstance cls val
 bindPrimitiveObject val@(VFloat _) = do
-  cls <- getPrimClass "Real" 
+  cls <- getPrimClass "Real"
   return $ buildPrimInstance cls val
 bindPrimitiveObject VNil = do
   cls <- getPrimClass "NilClass"
@@ -80,10 +82,10 @@ getPrimClass str = do
 buildPrimInstance :: Object -- the class
                   -> Value  -- the value
                   -> Object
-buildPrimInstance cls val = Object 
+buildPrimInstance cls val = Object
                           { ivars = M.singleton "__value" val
                           , klass = cls
                           , modules = []
-                          , process = Nothing
+                          , process = unsafePerformIO newEmptyTMVarIO
                           }
 

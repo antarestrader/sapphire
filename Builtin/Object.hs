@@ -19,12 +19,14 @@ import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Monad.Except
+import Control.Concurrent.STM.TMVar
+import System.IO.Unsafe
 
 objectClass = spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
         klass = ROOT,
         modules = [],
-	process = Nothing,
+	process = unsafePerformIO newEmptyTMVarIO,
         super = ROOT,
         cvars = bootstrapset,
         cmodules = [],

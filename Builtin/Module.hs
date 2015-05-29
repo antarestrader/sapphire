@@ -1,6 +1,7 @@
 module Builtin.Module where
 
 import Control.Monad.IO.Class
+import Control.Concurrent.STM.TMVar
 import qualified Data.Map as M
 
 import Builtin.Utils
@@ -18,11 +19,12 @@ import AST
 moduleClass ::EvalM Object
 moduleClass = do
   VObject clsClass   <- eval ( EVar $ simple "Class")
+  tmvar <- liftIO $ newEmptyTMVarIO
   let cls =  Class
           { ivars = M.empty
           , klass = clsClass
           , modules = []
-          , process = Nothing
+          , process = tmvar
           , super = clsClass
           , cvars = M.empty
           , cmodules = []

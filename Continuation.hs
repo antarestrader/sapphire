@@ -33,6 +33,7 @@ type Message m r = (m, Continuation m r)
 
 -- | A list of messages to be processed (private ?)
 newtype MessageQueue m r = Queue (TChan (Message m r))
+  deriving (Eq)
 
 newMessageQueue :: IO (MessageQueue m r)
 newMessageQueue= Queue `fmap` newTChanIO
