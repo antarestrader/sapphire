@@ -44,7 +44,17 @@ bootstrapset = M.fromList [
        , ("extend", VFunction extendFn (1, Nothing))
        , ("modules",VFunction modulesFn  (0,Just 0))
        , ("method_missing", VFunction methodMissing (1, Nothing))
+       , ("==",     VFunction equality (1, Just 2))
        ]
+
+equality :: [Value] -> EvalM ()
+equality [other] = do -- try the other side first
+  slf <- gets self
+  callT other "==" [(VObject slf),VTrue]
+equality ((VObject other):_) = do -- compair using Object Identity as a last resort
+  slf <- gets self
+  replyM_ $ vbool (slf == other)
+equality _ = replyM_ VFalse
 
 methodMissing (msg:_) = do
   slf <- gets self
