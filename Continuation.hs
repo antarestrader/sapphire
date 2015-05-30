@@ -75,6 +75,7 @@ data Continuation m r =
       {
 	replier   :: TMVar r
       , receivers :: ContList m r
+      -- IDEA: If a method call chain is important, it belongs here.
       }
 
 -- | A new empty continuation
@@ -99,8 +100,8 @@ unsafeSend pid msg = do
   cont' <- newContIO
   writeQueue (snd pid) (msg, cont')
 
--- | respond to the message with what ever the responce to this call is.
---   proper tail recursion.
+-- | respond to the message with whatever the response to this call is.
+--   Proper tail recursion.
 tail ::  Continuation m r -> ProcessId m r -> m -> IO ()
 tail cont pid msg = do
   let queue = shadowChannel pid cont
@@ -119,7 +120,7 @@ dispatch obj responder cont pid msg = do
         r <- atomically ((readTChan chan >>= (return . Left)) `orElse` (readTMVar answer >>= (return . Right)))
         case r of
           Left m -> do
-            obj' <- responder obj m 
+            obj' <- responder obj m
             case obj' of
               Just obj''  -> loop answer (Queue chan) obj''
               Nothing -> do  -- Process is told to terminate while waiting for answer

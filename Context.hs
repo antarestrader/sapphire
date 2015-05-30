@@ -24,6 +24,8 @@ module Context
   , tailC, tailM
   , replyM, replyM_
   , with
+  , setScope
+  , setGlobal
   , newContext
   , newContextIO
   , lookupLocals
@@ -51,6 +53,8 @@ import Continuation hiding (Responder, Message, Continuation, Replier)
 data Context = Context
                { locals :: M.Map String Value
                , self :: Object  -- ^ The object itself
+               , scope :: Maybe Object  -- ^ The class / module we are in
+               , global :: Object -- ^ the global scope refered to by the prefix scope operator (eg `::Foo`) nominally Object
                , continuation :: Continuation
                , responder :: Responder
                }
@@ -58,6 +62,8 @@ data Context = Context
 newContext obj cont resp = Context
   { locals = M.empty
   , self = obj
+  , scope = Nothing
+  , global = ROOT
   , continuation = cont
   , responder = resp
   }
@@ -107,15 +113,18 @@ sendM pid msg = do
   cont <- gets continuation
   liftIO $ send cont pid msg
 
+-- | Respond to our caller with the result of this call.  I.e. we send
+--   the return address we got on to this function rather then create one
+--   to listen to ourselves.
+--   Proper tail recursion.
 tailC :: Context->Process->Message-> IO ()
 tailC c pid msg = tail (continuation c) pid msg
 
+-- | Same as @tailC@ but with the context embedded in a state monad
 tailM :: (MonadState Context m, MonadIO m) => Process -> Message -> m ()
 tailM pid msg = do
   cont <- gets continuation
   liftIO $ tail cont pid msg
-
--- TODO modifySelf, modifySelfM
 
 -- | Send a response to the calling process if no response has yet been given.
 --   Returns true if the response was sent, false if a previous value had been
@@ -145,7 +154,7 @@ canReply = not `fmap` hasReply
 -- if there is a deadlock bug, look here.
 extract :: (MonadState Context m, MonadIO m) => m () -> m Response
 extract act = do
-  cOld@Context{continuation = cont} <- get
+  Context{continuation = cont} <- get
   r <- liftIO newEmptyTMVarIO
   modify (\ctx -> ctx{continuation = cont{replier = r}})
   act
@@ -153,19 +162,25 @@ extract act = do
   liftIO $ atomically $ readTMVar r
 
 -- | Evaluate a method with the given object as self.  Returns both the result
---   and a potentially modified version of the object.
+--   and a potentially modified version of the object. Any other changes to the
+--   context (ie scope and global) are discarded.
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
-  self' <- gets self
-  modifySelf $ const obj
+  ctx <- get
+  put ctx{self= obj}
   a <- f
   obj' <- gets self
-  modifySelf $ const self'
+  put ctx
   return (a, obj')
 
 -- | update the @self@ object of the current context
 modifySelf ::  (MonadState Context m) => (Object -> Object) -> m ()
 modifySelf f = modify (\context -> context{self = f $ self context})
+
+setScope :: (MonadState Context m) => Object  -> m ()
+setScope cls = modify (\context -> context{scope = Just cls})
+
+setGlobal cls = modify (\context -> context{global = cls})
 
 lookupLocals :: String -> Context -> Maybe Value
 lookupLocals s Context{locals = l} = M.lookup s l
