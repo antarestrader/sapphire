@@ -38,11 +38,21 @@ boot = do
   send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Class", EValue $ VObject cls] Private)
 
   tmvar <- newEmptyTMVarIO
-  let self = Object {ivars = M.fromList [("test",VInt 5)], modules=[], klass = object, process=tmvar}
+  let self = Object
+             {  ivars   = M.fromList [("test",VInt 5)]
+             ,  modules = []
+             ,  klass   = object
+             ,  process = tmvar
+             }
   context <- newContextIO self responderObject
   file <- getExecutablePath
-  let context' = insertLocals "__FILE__"  (VString $ mkStringLiteral file) context
-  r <- runEvalM (load baseLibrary) context'
+  -- let context' = insertLocals "__FILE__"  (VString $ mkStringLiteral file) context
+  let startupSequence = do
+        setScope  object
+        setGlobal object
+        eval $ Assign (LVar $ simple "__FILE__") (EString file)
+        load baseLibrary
+  r <- runEvalM startupSequence context       
   case r of
     Left err -> putStrLn (show err) >> return context
     Right (res, c) -> return c

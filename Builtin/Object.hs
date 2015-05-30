@@ -22,7 +22,8 @@ import Control.Monad.Except
 import Control.Concurrent.STM.TMVar
 import System.IO.Unsafe
 
-objectClass = spawn $ Class{
+objectClass :: IO Object
+objectClass = spawnObject $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
         klass = ROOT,
         modules = [],

@@ -19,7 +19,13 @@ import Control.Monad.Except
 import Control.Concurrent.STM
 import System.IO.Unsafe
 
-classClass object = spawn $ Class{
+classClass :: Object -> IO Object
+classClass object = do
+  ctx <- newContextIO object undefined
+  Right (cls, _) <- flip runEvalM ctx $ do -- none of these operations can fail
+    setScope  object
+    setGlobal object
+    spawn $ Class{
         ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
 	klass = ROOT,
 	modules = [],
@@ -28,6 +34,7 @@ classClass object = spawn $ Class{
 	cvars = bootstrap,
         cmodules = [],
 	properName = "Class"}
+  return cls        
 
 bootstrap = M.fromList [
          ("new"     , VFunction new   (0,Nothing))
@@ -65,7 +72,7 @@ new [] = do
 spawnFn xs = do
   (Response r) <- extract $ new xs
   r' <- valToObj r
-  obj <- liftIO $ spawn r'
+  obj <- spawn r'
   replyM_ $ VObject obj
 
 to_s [] = do

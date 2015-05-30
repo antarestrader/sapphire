@@ -2,6 +2,7 @@
 -- | This module impliments the consept of non local objects.
 module Object.Spawn (
     spawn
+  , spawnObject
   , responderObject
   )
 where
@@ -13,7 +14,7 @@ import Object.Graph
 import {-# SOURCE #-} Eval
 import AST
 import Err
-import Var
+import Var hiding (scope)
 import Context
 import qualified Data.Map as M
 import Control.Monad.Error.Class
@@ -21,22 +22,33 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
+import Control.Monad.IO.Class
+import Control.Monad.State
 
 -- | convert a object into a non-local object (aka a PID)
-spawn :: Object -> IO Object
+spawn :: Object -> EvalM Object
 spawn obj@(Pid {}) = return obj
 spawn obj = do
-  pro <- atomically $ tryTakeTMVar $ process obj
+  pro <- liftIO $ atomically $ tryTakeTMVar $ process obj
+ 
   case pro of
     Nothing -> do
-      process_id <- C.respondWith obj responderObject
-      C.unsafeSend process_id (Initialize process_id)
+      scp <- gets scope
+      gbl <- gets global
+      process_id <- liftIO $ C.respondWith gbl scp obj responderObject
+      liftIO $ C.unsafeSend process_id (Initialize process_id)
       return $ Pid process_id
     Just pid ->  return $ Pid pid
 
+spawnObject :: Object->IO Object
+spawnObject obj = do
+  process_id <- C.respondWith obj obj obj responderObject
+  C.unsafeSend process_id (Initialize process_id)
+  return $ Pid process_id
+
 -- | This is the function responsible for dealing with incomming messages
 responderObject :: C.Responder Object Message Response
-responderObject obj msg =
+responderObject global scope obj msg  =
   case fst msg of
     Eval        exp -> evaluate exp obj (snd msg)
     Search IVars str -> do

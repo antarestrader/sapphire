@@ -52,20 +52,20 @@ type ProcessId m r = (ThreadId, MessageQueue m r)
 type ContList m r = [ProcessId m r]
 
 -- | A function to process one message and provide a new state
-type Responder o m r = o -> Message m r -> IO (Maybe o)
+type Responder o m r =  o -> o -> o -> Message m r -> IO (Maybe o)
 
 -- | Given and initial state and a Responder creates a process that
 --   will respond to messages and keep track of the state
-respondWith :: o -> Responder o m r ->  IO (ProcessId m r)
-respondWith o r = do
+respondWith :: o-> o-> o -> Responder o m r ->  IO (ProcessId m r)
+respondWith global scope obj r = do
   queue <- newMessageQueue
-  tid <- forkIO (loop queue (Just o))
+  tid <- forkIO (loop queue (Just obj))
   return (tid, queue)
     where
-      loop queue (Just o)= do
+      loop queue (Just obj)= do
         m  <- readQueue queue
-        o' <- r o m
-        loop queue o'
+        obj' <- r global scope obj m
+        loop queue obj'
       loop _ Nothing = return ()
 
 -- | The information needed to respond to a message. In order to avoid
@@ -109,8 +109,8 @@ tail cont pid msg = do
 
 
 -- | send a message and wait for the response
-dispatch :: a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO (r, a)
-dispatch obj responder cont pid msg = do
+dispatch :: a -> a -> a -> Responder a m r -> Continuation m r -> ProcessId m r-> m -> IO (r, a)
+dispatch global scope obj responder cont pid msg = do
   (cont', responseQueue) <- shadow cont -- set up a shadowed reciever
   let dispatchQueue =  shadowChannel pid cont' -- where to send the message
   writeQueue dispatchQueue (msg, cont') -- send the message
@@ -120,7 +120,7 @@ dispatch obj responder cont pid msg = do
         r <- atomically ((readTChan chan >>= (return . Left)) `orElse` (readTMVar answer >>= (return . Right)))
         case r of
           Left m -> do
-            obj' <- responder obj m
+            obj' <- responder global scope obj m
             case obj' of
               Just obj''  -> loop answer (Queue chan) obj''
               Nothing -> do  -- Process is told to terminate while waiting for answer

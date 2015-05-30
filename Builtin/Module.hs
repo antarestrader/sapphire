@@ -30,7 +30,7 @@ moduleClass = do
           , cmodules = []
           , properName = "Module"
           }
-  pid <- liftIO $ spawn cls
+  pid <- spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
   eval $ Call (EVar $ simple "Object") "setCVar" [EAtom "Module", EValue $ VObject pid]
   return pid

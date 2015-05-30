@@ -45,7 +45,7 @@ import String
 import qualified Array as A
 import Hash
 import Builtin.Hash
-import Context
+import Context hiding (scope, global)
 import Var
 import Utils
 import Control.Monad
@@ -303,12 +303,15 @@ buildClass n super exp = do
           , cmodules = []
 	  , properName = name n
 	  }
-  Pid pid <- liftIO $ spawn cls
+  Pid pid <- spawn cls
   sendM pid $ Eval exp
-  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
+  registerClass n pid
 
-  return $ VObject $ Pid pid
-
+-- | Find or create a module for local method definations.  This function
+--   returns both the local module and a function to return that module and
+--   a function to place that module backe into self.  Note: it is a bug to
+--   either a) modify the list of modules or b) change the meaning of self
+--   between the call to localModuled and this function. 
 localModule :: EvalM (Object, (Object -> EvalM()))
 localModule = do
   slf <- gets self
@@ -337,13 +340,13 @@ newModule str = do
 
 buildModule n exp = do
   mdl <- newModule $ name n
-  Pid pid <- liftIO $ spawn mdl
+  Pid pid <- spawn mdl
   sendM pid $ Eval exp
-  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
+  registerClass n pid
 
-registerClass :: String -> Process -> EvalM Value
+registerClass :: Var -> Process -> EvalM Value
 registerClass n pid =
-  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom n, EValue $ VObject $ Pid pid] --fixme should be parent module
+  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
 
 -- | The internal working so making a function
 mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)

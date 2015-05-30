@@ -45,7 +45,7 @@ buildClassEx name bootstrap clsBoot = do
           , cmodules = []
           , properName = name
           }
-  pid <- liftIO $ spawn cls
+  pid <- spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
   eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
   return pid

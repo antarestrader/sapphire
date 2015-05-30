@@ -23,7 +23,7 @@ module Context
   , sendM
   , tailC, tailM
   , replyM, replyM_
-  , with
+  , with, scope, global
   , setScope
   , setGlobal
   , newContext
@@ -53,7 +53,7 @@ import Continuation hiding (Responder, Message, Continuation, Replier)
 data Context = Context
                { locals :: M.Map String Value
                , self :: Object  -- ^ The object itself
-               , scope :: Maybe Object  -- ^ The class / module we are in
+               , scope :: Object  -- ^ The class / module we are in
                , global :: Object -- ^ the global scope refered to by the prefix scope operator (eg `::Foo`) nominally Object
                , continuation :: Continuation
                , responder :: Responder
@@ -62,7 +62,7 @@ data Context = Context
 newContext obj cont resp = Context
   { locals = M.empty
   , self = obj
-  , scope = Nothing
+  , scope = ROOT
   , global = ROOT
   , continuation = cont
   , responder = resp
@@ -86,7 +86,7 @@ dispatchC :: Context -- ^ the current Context
           -> Message -- ^ The message to be sent
           -> IO (Response, Context) -- ^ the responce to the message, the updated context
 dispatchC c pid msg= do
-  (val, self') <- dispatch (self c) (responder c) (continuation c) pid msg
+  (val, self') <- dispatch (global c) (scope c) (self c) (responder c) (continuation c) pid msg
   return (val, c{self=self'})
 
 -- | Like dispatchC above, but ignores any changes made to the object itself.
@@ -178,7 +178,7 @@ modifySelf ::  (MonadState Context m) => (Object -> Object) -> m ()
 modifySelf f = modify (\context -> context{self = f $ self context})
 
 setScope :: (MonadState Context m) => Object  -> m ()
-setScope cls = modify (\context -> context{scope = Just cls})
+setScope cls = modify (\context -> context{scope = cls})
 
 setGlobal cls = modify (\context -> context{global = cls})
 
