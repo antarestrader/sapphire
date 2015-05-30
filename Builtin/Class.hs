@@ -34,11 +34,12 @@ classClass object = do
 	cvars = bootstrap,
         cmodules = [],
 	properName = "Class"}
-  return cls        
+  return cls
 
 bootstrap = M.fromList [
          ("new"     , VFunction new   (0,Nothing))
        , ("setCVar" , VFunction setCVar (2,Just 2))
+       , ("setIVar" , VFunction setIVar (2,Just 2))
        , ("spawn"   , VFunction spawnFn (0,Nothing))
        , ("to_s"    , VFunction to_s (0, Just 0 ))
        , ("include" , VFunction includeFn (1, Nothing))
@@ -48,6 +49,10 @@ bootstrap = M.fromList [
 
 setCVar [VAtom n,val] = do
   modifySelf $ insertCVars n val
+  replyM_ val
+
+setIVar [VAtom n,val] = do
+  modifySelf $ insertIVars n val
   replyM_ val
 
 new :: [Value] -> EvalM ()

@@ -2,6 +2,7 @@ module Builtin.Module where
 
 import Control.Monad.IO.Class
 import Control.Concurrent.STM.TMVar
+import Control.Monad.State
 import qualified Data.Map as M
 
 import Builtin.Utils
@@ -10,6 +11,7 @@ import Err
 import Eval
 import Object
 import Var
+import Context
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} Object.Spawn (spawn)
 import AST
@@ -32,6 +34,7 @@ moduleClass = do
           }
   pid <- spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
-  eval $ Call (EVar $ simple "Object") "setCVar" [EAtom "Module", EValue $ VObject pid]
+  scp <- gets Context.scope
+  callT (VObject scp) "setIVar" [VAtom "Module", VObject pid]
   return pid
 

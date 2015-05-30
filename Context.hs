@@ -167,7 +167,13 @@ extract act = do
 with ::  (MonadState Context m, MonadIO m) => Object -> m a -> m(a, Object)
 with obj f = do
   ctx <- get
-  put ctx{self= obj}
+  case obj of
+    Class{} -> do
+      -- Warning: For a local scope, changes made in the scope (rather then to self) will not be saved.
+      -- Don't define classes withn `class self`
+      scp <- (liftIO $ atomically $ tryReadTMVar $ process obj) >>= return . maybe obj Pid
+      put ctx{self= obj, scope = scp}
+    _ -> put ctx{self= obj}
   a <- f
   obj' <- gets self
   put ctx

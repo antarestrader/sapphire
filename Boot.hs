@@ -34,8 +34,8 @@ boot = do
   cont <- newContIO
   send cont obj_pid (Eval $ Apply (simple "setClass") [EValue $ VObject cls] Private)
   send cont cls_pid (Eval $ Apply (simple "setClass") [EValue $ VObject cls] Private)
-  send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Object", EValue $ VObject object] Private)
-  send cont obj_pid (Eval $ Apply (simple "setCVar")  [EValue $ VAtom "Class", EValue $ VObject cls] Private)
+  send cont obj_pid (Eval $ Apply (simple "setIVar")  [EValue $ VAtom "Object", EValue $ VObject object] Private)
+  send cont obj_pid (Eval $ Apply (simple "setIVar")  [EValue $ VAtom "Class", EValue $ VObject cls] Private)
 
   tmvar <- newEmptyTMVarIO
   let self = Object

@@ -78,6 +78,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.State.Class
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Char
 
 
 -- |  This function turns a 'Value' into an 
@@ -150,6 +151,9 @@ data MutableObject = MO ((Value -> Object -> Object) -> Value -> EvalM ()) Objec
 moself :: Object -> MutableObject
 moself = MO (\f val' -> modifySelf (f val'))
 
+moerror :: Object -> MutableObject
+moerror obj = MO (\_ _ ->  throwError $ strMsg "Attempted to mutate a Class variable") obj
+
 data MutableValue = MV (Value -> EvalM()) Value
 
 mutableValueToValue :: MutableValue -> Value
@@ -166,6 +170,7 @@ mvnil str (MO update _)  = MV (updateIvars str update) VNil
 mverror = MV (\_ -> throwError $ strMsg "Attempted to mutate a Class variable")
 
 searchLocal :: String -> EvalM(Maybe MutableValue)
+searchLocal "" = gets ( Just . mverror . VObject . global )-- empty top string means global scope
 searchLocal str = runMaybeT $ msum $ [a,b]
   where a = fmap (MV $ insertLocalM str) $ MaybeT $ gets $ directLocals str
         b = MaybeT $ do
@@ -178,10 +183,12 @@ searchObject _ (MO _ ROOT) = return Nothing
 searchObject str (MO _ (Pid p)) = do
   r <- responseToMaybe $ remoteObject str p
   return $ fmap (MV undefined ) r
-searchObject str (MO update obj) = runMaybeT $ msum $ map MaybeT [a,b,c]
+searchObject str (MO update obj) = runMaybeT $ msum $ map MaybeT [a,b,c,d,e]
   where a = return $ fmap (MV $ updateIvars str update) $ directIVars str obj
-        b = searchModules str (modules obj) >>= return . fmap mverror
-        c = searchClass str (klass obj)  >>= return . fmap mverror
+        b = if (isUpper $ head str) then (gets Context.scope  >>= (searchIVars str . moerror)) else (return Nothing)
+        c = if (isUpper $ head str) then (gets global >>= (searchIVars str . moerror)) else (return Nothing)
+        d = searchModules str (modules obj) >>= return . fmap mverror
+        e = searchClass str (klass obj)  >>= return . fmap mverror
 
 searchMethods :: String -> Object -> EvalM(Maybe Value)
 searchMethods _ ROOT = return Nothing
@@ -233,12 +240,11 @@ lookupVar Self = do
   return $ MV (\(VObject obj) -> modifySelf (const obj)) (VObject slf)
 lookupVar var = do
     let str = top var
-    -- TODO: handle case when var is top level (eg ::Foo::Bar)
     r <- searchLocal str
     case (r,bottom var) of
       (Just v,  Nothing ) -> return v
       (Nothing, Nothing ) -> return $ MV (insertLocalM str) VNil
-      (Nothing, Just _  ) -> throwError $ Err "NotFoundError" str []
+      (Nothing, Just _  ) -> throwError $ Err "NotFoundError" ("'"++str++"'") []
       (Just v, Just var') -> lookupVarIn var' v
   where
     lookupVarIn :: Var -> MutableValue -> EvalM(MutableValue)

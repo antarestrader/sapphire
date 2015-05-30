@@ -46,6 +46,7 @@ import qualified Array as A
 import Hash
 import Builtin.Hash
 import Context hiding (scope, global)
+import qualified Context as CTX
 import Var
 import Utils
 import Control.Monad
@@ -345,8 +346,9 @@ buildModule n exp = do
   registerClass n pid
 
 registerClass :: Var -> Process -> EvalM Value
-registerClass n pid =
-  eval $ Call (EVar Var{name="Object", scope=[]}) "setCVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme should be parent module
+registerClass n pid = do
+  scp <- gets CTX.scope
+  eval $ Call (EValue $ VObject $ scp) "setIVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme: why CVars?
 
 -- | The internal working so making a function
 mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)

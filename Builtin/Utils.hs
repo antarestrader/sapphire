@@ -48,7 +48,7 @@ buildClassEx name bootstrap clsBoot = do
   pid <- spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
   scp <- gets scope
-  callT (VObject scp) "setCVar" [VAtom name, VObject pid]
+  callT (VObject scp) "setIVar" [VAtom name, VObject pid]
   return pid
 
 includeModule :: Object -> M.Map String Value -> EvalM Object
