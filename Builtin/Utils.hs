@@ -9,7 +9,7 @@ import {-# SOURCE #-} Eval
 import Object
 import AST
 import Err
-import Context (self, replyM_, sendM)
+import Context (self, replyM_, sendM, scope)
 import Object.Graph (lookupIVar, MutableValue(..))
 import {-# SOURCE #-} Object.Spawn (spawn)
 import Var (simple)
@@ -47,7 +47,8 @@ buildClassEx name bootstrap clsBoot = do
           }
   pid <- spawn cls
   -- sendM pid $ Eval <<initialization>>  -- no initialization needed at this time
-  eval $ Call (EVar $ simple "Object") "setCVar" [EAtom name, EValue $ VObject pid]
+  scp <- gets scope
+  callT (VObject scp) "setCVar" [VAtom name, VObject pid]
   return pid
 
 includeModule :: Object -> M.Map String Value -> EvalM Object

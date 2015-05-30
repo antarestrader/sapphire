@@ -30,7 +30,7 @@ spawn :: Object -> EvalM Object
 spawn obj@(Pid {}) = return obj
 spawn obj = do
   pro <- liftIO $ atomically $ tryTakeTMVar $ process obj
- 
+
   case pro of
     Nothing -> do
       scp <- gets scope
@@ -48,9 +48,9 @@ spawnObject obj = do
 
 -- | This is the function responsible for dealing with incomming messages
 responderObject :: C.Responder Object Message Response
-responderObject global scope obj msg  =
+responderObject gbl scp obj msg  =
   case fst msg of
-    Eval        exp -> evaluate exp obj (snd msg)
+    Eval         exp -> evaluate exp gbl scp obj (snd msg)
     Search IVars str -> do
       case (directIVars str obj) of
         Nothing -> C.reply (snd msg) NothingFound >> (return $ Just obj)
@@ -81,7 +81,7 @@ responderObject global scope obj msg  =
     PushCModule val@(VObject obj) -> case obj of
       Class{cmodules = c} -> C.reply (snd msg) (Response val) >> (return $ Just $ obj{cmodules = (obj:c)})
       _ -> C.reply (snd msg) (Error $ Err "RunTimeError" "Object is not a class" [VObject obj]) >>  (return $ Just $ obj)
-    Execute     var args  -> call obj var args (snd msg)
+    Execute     var args  -> call gbl scp obj var args (snd msg)
     Initialize  pid -> do
       obj' <- initialize pid obj
       C.reply (snd msg) $ Response $ VObject $ Pid pid
@@ -97,29 +97,36 @@ initialize pid obj = do
       return $ Just obj
     False -> return Nothing
 
-evaluate :: Exp -> Object -> Continuation -> IO (Maybe Object)
-evaluate exp obj cont = do
-  let context = newContext obj cont responderObject
+evaluate :: Exp -> Object -> Object->Object -> Continuation -> IO (Maybe Object)
+evaluate exp gbl scp obj cont = do
+  context <- mkContext gbl scp obj cont
   result <- runEvalM (eval exp) context
   case result of
     Left  err -> C.reply cont (Response $ VError err) >> (return $ Just obj)
     Right (val,context) -> C.reply cont (Response val) >> (return $ Just (self context))  -- not proper tail call
 
--- WARNING: this function looses mutiations to Object if that is important
--- use evaluate instead.
+-- WARNING: this function loses mutations to Object. If that is important
+-- use `evaluate` instead.
 run :: Object -> Continuation -> (Err Value -> a) -> EvalM a -> IO a
 run obj cont fixerror action = do
-  let context = newContext obj cont responderObject
+  context <- mkContext ROOT ROOT obj cont
   result <- runEvalM action context
   case result of
     Left err -> return $ fixerror err
     Right (a,_) -> return a
 
 
-call :: Object -> Var -> [Value] -> Continuation -> IO (Maybe Object)
-call obj var args cont = do
-  let context =  newContext obj cont responderObject
+call :: Object-> Object->Object -> Var -> [Value] -> Continuation -> IO (Maybe Object)
+call gbl scp obj var args cont = do
+  context <- mkContext gbl scp obj cont
   result <- runEvalM (evalT $ Apply var (map EValue args) Public) context
   case result of
     Left  err -> (C.reply cont (Response $ VError err)) >> (return $ Just obj)
     Right ((),context) -> return $ Just (self context)
+
+mkContext gbl scp obj cont= do
+  case obj of
+    Class{} -> do
+         cls <- atomically $ tryReadTMVar $ process obj
+         return (newContext obj cont responderObject){scope = (maybe obj Pid cls) , global = gbl}
+    _ -> return (newContext obj cont responderObject){scope = scp, global = gbl}
