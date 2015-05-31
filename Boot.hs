@@ -17,7 +17,7 @@ import Object.Spawn
 import String
 import Continuation (send, newContIO)
 import qualified Data.Map as M
-import System.Environment
+import System.Environment.Executable
 import Control.Concurrent.STM.TMVar
 
 

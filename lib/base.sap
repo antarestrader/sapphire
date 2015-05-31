@@ -9,7 +9,7 @@ load "lib/base/Array.sap"
 
 # the require method
 
-Directory::required = [Directory.canonical "lib/base/Array"]
+Directory::required = [Directory.canonical "lib/base/Array.sap"]
 
 module System
   def require(file)
