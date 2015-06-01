@@ -45,8 +45,11 @@ bootstrapset = M.fromList [
        , ("extend", VFunction extendFn (1, Nothing))
        , ("modules",VFunction modulesFn  (0,Just 0))
        , ("method_missing", VFunction methodMissing (1, Nothing))
+       , ("initialize", VFunction initFn (0, Nothing))
        , ("==",     VFunction equality (1, Just 2))
        ]
+
+initFn _ = replyM_ VNil --by default, do nothing    
 
 equality :: [Value] -> EvalM ()
 equality [other] = do -- try the other side first

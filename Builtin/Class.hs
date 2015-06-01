@@ -56,7 +56,19 @@ setIVar [VAtom n,val] = do
   replyM_ val
 
 new :: [Value] -> EvalM ()
-new [] = do
+new vals = do
+  obj <- VObject `fmap` newObject
+  -- evalT $ Call (EValue obj) "initialize" $ map EValue vals 
+  replyM_ obj
+
+spawnFn xs = do
+  obj  <- newObject
+  obj'@(Pid pid) <- spawn obj
+  sendM pid $ Execute (simple "initialize") xs
+  replyM_ $ VObject obj'
+
+newObject :: EvalM Object
+newObject = do
   slf <- gets self
   tmvar <- liftIO $ newEmptyTMVarIO
   slf' <- case slf of
@@ -65,20 +77,15 @@ new [] = do
             pid <- liftIO $ atomically $ tryReadTMVar $ process cls
             return $ maybe slf Pid pid
       _ -> error "trying to make instantiate a regular object.  What would that even mean?"
-  let obj = VObject $ Object {
+  return $  Object {
       ivars = M.empty
     , klass = slf'
     , modules = []
     , process =  tmvar
     }
-  -- initialize here
-  replyM_ obj
 
-spawnFn xs = do
-  (Response r) <- extract $ new xs
-  r' <- valToObj r
-  obj <- spawn r'
-  replyM_ $ VObject obj
+
+
 
 to_s [] = do
   (VObject Class{properName = s}) <- eval (EVar Self)
