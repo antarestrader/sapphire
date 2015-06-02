@@ -1,0 +1,3 @@
+class Error
+  def to_s
+    "#{@error}: #{@message} with #{@vars}"

@@ -34,6 +34,7 @@ class Object
 
 require "lib/base/Number.sap"
 require "lib/base/Hash.sap"
+require "lib/base/error.sap"
 
 class Function
   def is_function?
@@ -48,6 +49,9 @@ class NilClass
 
   def nil?
     true
+  
+  def method_missing (meth, args)
+    Error.new("MethodMissing", "the method #{meth} hit nil", args)
 
 class String
   def to_s

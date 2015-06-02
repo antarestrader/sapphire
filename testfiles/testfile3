@@ -1,6 +1,6 @@
 class Foo
   def to_s
-    "An instance of class Foo"
+    "Foo: qaax = #{qaax}; @baz=#{baz}."
 
   def bar(a,b)
     @qaax = a + b

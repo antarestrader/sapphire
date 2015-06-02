@@ -18,6 +18,7 @@ import Builtin.Directory
 import Builtin.String
 import Builtin.Error
 import Object
+import Object.Spawn
 import qualified Data.Map as M
 import Control.Monad.Except
 import Control.Concurrent.STM.TMVar
@@ -68,6 +69,9 @@ bindPrimitiveObject val@(VFalse) = do
 bindPrimitiveObject val@(VAtom _) = do
   cls <- getPrimClass "Atom"
   return $ buildPrimInstance cls val
+bindPrimitiveObject (VError (Err typ msg vals)) = do
+  VObject obj <- eval $ Call (EVar $ simple "Error") "new" (EString typ : EString msg : (map EValue vals))
+  return obj
 bindPrimitiveObject val = throwError $ Err "SystemError" "No Class for this type" [val] --TODO impliment classes
 
 -- | lookup the class for primitive values in the current context.
