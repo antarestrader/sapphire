@@ -109,7 +109,8 @@ eval (Call expr msg args) = do
       vals <- mapM eval args
       (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
     receiver -> do
-      (result, obj') <- with receiver $ eval (Apply (simple msg) args Public)
+      args' <- mapM (liftM EValue . eval) args
+      (result, obj') <- with receiver $ eval (Apply (simple msg) args' Public)
       f $ VObject obj' -- update self
       return result
 
@@ -242,7 +243,9 @@ evalT (Call expr msg args) = do
     Pid pid -> do
       vals <- mapM eval args
       tailM pid (Execute (simple msg) vals)
-    receiver -> fmap fst $ with receiver $ evalT (Apply (simple msg) args Public)
+    receiver -> do
+      args' <- mapM (liftM EValue . eval) args
+      fmap fst $ with receiver $ evalT (Apply (simple msg) args' Public)
     -- TODO: put self back (see issue #28 on github)
 evalT (Block exps file) = do
   insertLocalM "__FILE__" $ VString $ mkStringLiteral file
