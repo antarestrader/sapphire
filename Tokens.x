@@ -36,6 +36,7 @@ tokens :-
  <interp> "#" [^ \} ]*  ;
  <0, interp> ","                     {\s -> makeToken $ TComma}
  <0, interp> "!"                     {\s -> makeToken $ TBang}
+ <0, interp> "!="                    {\s -> makeToken $ TOperator s}
  <0, interp> "::"                    {\s -> makeToken $ TScope}
  <0, interp> "="                     {\s -> makeToken $ TAssign}
  <0, interp> "=="                    {\s -> makeToken $ TOperator s}

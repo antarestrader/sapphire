@@ -34,7 +34,7 @@ class Object
 
 require "lib/base/Number.sap"
 require "lib/base/Hash.sap"
-require "lib/base/error.sap"
+require "lib/base/Error.sap"
 
 class Function
   def is_function?
