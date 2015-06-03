@@ -151,6 +151,17 @@ eval (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
 
+eval (While cond exp) =
+  let 
+    loop last = do
+      cond' <- eval cond
+      case cond' of
+        (VNil) -> return last
+        (VFalse) -> return last
+        _ -> loop =<< eval exp
+  in
+    loop VNil
+
 eval (EClass Self _ exp) = do
   (mdl, update) <- localModule
   (val,mdl')<- with mdl $ eval exp

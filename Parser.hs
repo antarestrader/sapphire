@@ -457,6 +457,14 @@ ifBlock' = nakedThenBlock <|> thenLine <|> simpleBlock
       return (Block exps file, Nothing)
     elseParse = optionMaybe (keyword "else" >> (block <|> termExpr))
 
+whileParser :: TParser Exp
+whileParser = do
+  keyword "while"
+  cond <- expr
+  loop <- (block <|> termExpr)
+  return $ While cond loop
+
+
 classParser :: TParser Exp
 classParser = do
   keyword "class"
@@ -561,7 +569,7 @@ expr1 = do
 
 -- | forms not subject to extending parsers. These parsers include their own
 --   intrensic check for line termination.
-statement = lambda <|> ifParser <|> defParser <|> defineParser <|> classParser <|> moduleParser
+statement = lambda <|> ifParser <|> whileParser <|> defParser <|> defineParser <|> classParser <|> moduleParser
 
 -- | All possible forms of a single expression
 expr = statement <|> expr1
