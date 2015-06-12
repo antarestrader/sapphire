@@ -169,6 +169,7 @@ mvnil str (MO update _)  = MV (updateIvars str update) VNil
 
 mverror = MV (\_ -> throwError $ strMsg "Attempted to mutate a Class variable")
 
+
 searchLocal :: String -> EvalM(Maybe MutableValue)
 searchLocal "" = gets ( Just . mverror . VObject . global )-- empty top string means global scope
 searchLocal str = runMaybeT $ msum $ [a,b]
@@ -187,27 +188,33 @@ searchObject str (MO update obj) = runMaybeT $ msum $ map MaybeT [a,b,c,d,e]
   where a = return $ fmap (MV $ updateIvars str update) $ directIVars str obj
         b = if (isUpper $ head str) then (gets Context.scope  >>= (searchIVars str . moerror)) else (return Nothing)
         c = if (isUpper $ head str) then (gets global >>= (searchIVars str . moerror)) else (return Nothing)
-        d = searchModules str (modules obj) >>= return . fmap mverror
-        e = searchClass str (klass obj)  >>= return . fmap mverror
+        d = searchModules str (modules obj) >>= return . fmap (mverror . mwsValue)
+        e = searchClass str (klass obj)  >>= return . fmap (mverror . mwsValue)
 
-searchMethods :: String -> Object -> EvalM(Maybe Value)
+searchMethods :: String -> Object -> EvalM(Maybe MethodWithSuper)
 searchMethods _ ROOT = return Nothing
-searchMethods str (Pid p) = responseToMaybe $ remoteMethods str p
+searchMethods str (Pid p) = responseToMWS $ remoteMethods str p
 searchMethods str obj = runMaybeT $ msum $ map MaybeT [b,c]
   where b = searchModules str (modules obj)
         c = searchClass str (klass obj)
 
-searchClass :: String -> Object -> EvalM(Maybe Value)
+searchClass :: String -> Object -> EvalM(Maybe MethodWithSuper)
 searchClass _ ROOT = return Nothing
-searchClass str (Pid p) = responseToMaybe $ remoteClass str p
+searchClass str (Pid p) = responseToMWS $ remoteClass str p
 searchClass str obj@Object{} = throwError $ Err "GraphSearchError" "Tried to find class methods on an object that was not a class." [VObject obj]
 searchClass str cls@Class{} = runMaybeT $ msum $ map MaybeT [a,b,c]
-  where a = return $ directCVars str cls
+  where a = return (MWS continueSearch `fmap` directCVars str cls) 
         b = searchModules str (cmodules cls) 
         c = searchClass str (super cls)
+        continueSearch =  runMaybeT $ msum $ map MaybeT [b,c]
 
-searchModules :: String ->[Object] -> EvalM(Maybe Value)
-searchModules str ms = runMaybeT $ msum $ map (MaybeT . searchCVars str) ms
+searchModules :: String ->[Object] -> EvalM(Maybe MethodWithSuper)
+searchModules str [] = return Nothing
+searchModules str (m:ms) = do
+  mval <- searchCVars str m
+  case mval of
+    Nothing  -> searchModules str ms
+    Just val -> return $ Just $ MWS (searchModules str ms) val  
 
 searchCVars :: String -> Object -> EvalM(Maybe Value)
 searchCVars str ROOT = return Nothing
@@ -228,10 +235,19 @@ responseToMaybe :: EvalM Response -> EvalM(Maybe Value)
 responseToMaybe action = do 
   r <- action
   case r of
+    (ResponseWithSuper mws) -> return $ Just $ mwsValue mws
     (Response value) -> return $ Just value
     (NothingFound)   -> return Nothing
     (Error err)      -> throwError err
 
+responseToMWS :: EvalM Response -> EvalM(Maybe MethodWithSuper)
+responseToMWS action = do 
+  r <- action
+  case r of
+    (ResponseWithSuper mws) -> return $ Just mws
+    (Response value)        -> return $ Just $ MWS (return Nothing) value
+    (NothingFound)          -> return Nothing
+    (Error err)             -> throwError err
 -- Lookup
 
 lookupVar :: Var -> EvalM(MutableValue)
@@ -274,7 +290,7 @@ lookupIVar str = do
     Nothing -> return $ MV (\val' -> modifySelf $ insertIVars str val') VNil
     Just v -> return $ MV (\val' -> modifySelf $ insertIVars str val') v
 
-lookupMethod :: String -> EvalM(Value)
+lookupMethod :: String -> EvalM(MethodWithSuper)
 lookupMethod str = do
   slf <- gets self
   r <- searchMethods str slf

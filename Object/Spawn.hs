@@ -62,7 +62,7 @@ responderObject gbl scp obj msg  =
     Search Methods str -> do
       r <- run obj (snd msg) (const Nothing) (searchMethods str obj)
       case r of
-        Just v  -> C.reply (snd msg) (Response v)  >> (return $ Just obj)
+        Just v  -> C.reply (snd msg) (ResponseWithSuper v)  >> (return $ Just obj)
         Nothing ->  C.reply (snd msg) NothingFound >> (return $ Just obj)
     Search ObjectGraph str -> do
       r <-  run obj (snd msg) (const Nothing) (searchObject str (MO undefined obj))
@@ -72,7 +72,7 @@ responderObject gbl scp obj msg  =
     Search ClassGraph str -> do
       r <- run obj (snd msg) (const Nothing) (searchClass str obj)
       case r of
-        Just v  -> C.reply (snd msg) (Response v) >> (return $ Just obj)
+        Just v  -> C.reply (snd msg) (ResponseWithSuper v) >> (return $ Just obj)
         Nothing ->  C.reply (snd msg) NothingFound >> (return $ Just obj)
     SetIVar str val -> C.reply (snd msg) (Response val) >> (return $ Just $ insertIVars str val obj)
     SetCVar str val -> C.reply (snd msg) (Response val) >> (return $ Just $ insertCVars str val obj)

@@ -15,12 +15,16 @@ import Context
 import {-# SOURCE #-} Eval
 import {-# SOURCE #-} Object.Spawn (spawn)
 import AST
+import Control.Monad.Except
 
 
 
 moduleClass ::EvalM Object
 moduleClass = do
-  VObject clsClass   <- eval ( EVar $ simple "Class")
+  c <- eval ( EVar $ simple "Class")
+  clsClass   <- case c of
+    VObject c' -> return c'
+    val -> throwError $ Err "SystemError" "the class Class missing" [val]
   tmvar <- liftIO $ newEmptyTMVarIO
   let cls =  Class
           { ivars = M.empty

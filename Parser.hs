@@ -346,6 +346,10 @@ args :: Bool-> Var -> TParser Exp
 args p var =
   (argumentList p >>= (\args->return (Apply var args Private))) <|> return (EVar var)
 
+super :: Bool -> TParser Exp
+super p = do
+  keyword "super"
+  (argumentList p >>= (\args-> return $ ESuper $ Just args)) <|> return (ESuper Nothing)
 
 unaryOperator :: TParser Exp
 unaryOperator = do
@@ -528,7 +532,7 @@ sent exp = do
   return $ Send exp s args
 
 -- | expressions which can safely be understood as the first argument in an unenclosed argument list
-safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> 
+safeExpr0 =  nil <|> falseP <|> trueP <|> (var >>= args False) <|> super False <|>
             ivar <|> atom   <|> float <|> int  <|>    exString <|> bangOperator
 
 safeExpr = do
@@ -545,7 +549,7 @@ safeExpr = do
 expr0 :: TParser Exp
 expr0 = paren
      <|> nil <|> falseP      <|> trueP <|> bangOperator <|> unaryOperator 
-     <|> (var >>= args True) <|> ivar  <|> atom         <|> float
+     <|> (var >>= args True) <|> super True   <|> ivar  <|> atom         <|> float
      <|> int <|> exString    <|> arrayLiteral           <|> hashLiteral 
      <?> "basic expression unit"
 

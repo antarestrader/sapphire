@@ -35,6 +35,7 @@ data Exp =
   | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
   | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
   | Send Exp String [Exp] -- ^ concurrent method invocation (foo->bar(x))
+  | ESuper (Maybe [Exp]) -- ^ a call to `super` with or without args
   | Assign LHS Exp -- ^ assignment of a var (see LHS)
   | OpAssign LHS Op Exp -- ^ assign new value based on the old ( a += 12)
   | If {predicate :: Exp,consequent :: Exp ,alternate :: Maybe Exp}

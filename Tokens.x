@@ -25,7 +25,7 @@ $opSym = [\+\-\/\<\>\%\$\^\~\=\*\~\&\|]
 @ident = [a-zA-Z_][a-zA-Z0-9_\?\!]*
 @stringchar = \\\"|[^\"] -- " <- this is here to keep the text formatting intact
 @stringchar2 = \\\'|[^\'] -- '
-@keywords = self|if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda
+@keywords = self|if|then|else|elsif|class|module|do|while|until|case|when|end|nil|false|true|def|define|lambda|super
 
 tokens :-
 

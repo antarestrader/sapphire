@@ -34,6 +34,7 @@ module Eval (
 where
 
 import qualified Data.Map as M
+import Data.Foldable (toList)
 import Data.Maybe
 import Data.Monoid
 import AST
@@ -121,14 +122,14 @@ eval (Index expr args) = do
     (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
     (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
 
-eval ast@(Apply _ _ _) = do
-  (fmap responseToValue) $ extract $ evalT ast
+eval ast@(Apply _ _ _) = (fmap responseToValue) $ extract $ evalT ast
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
-  case fn of
-    VFunction fn' arity -> (fmap responseToValue) $ extract $ apply fn' arity args
-    obj -> eval (Call (EValue obj) "call" args)
+  (fn,arity) <- mkFunctionFromValue (simple "<an expression>") fn
+  (fmap responseToValue) $ extract $ apply fn arity emptySuper args
+
+eval spr@(ESuper _) = (fmap responseToValue) $ extract $ evalT spr
 
 eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
 
@@ -207,7 +208,7 @@ eval (EHash xs) = do
   hash <- buildHashFromList x's
   return $ VHash hash
 
-eval exp = throwError $Err "SystemError" ("Cannot yet evaluate the following expression:\n" ++ show exp) []
+eval exp = throwError $ Err "SystemError" ("Cannot yet evaluate the following expression:\n" ++ show exp) []
 
 -- | Eval with context update
 --   When an expression could destructivally modify a sub-expression, it is
@@ -229,24 +230,24 @@ evalWithContext exp = fmap (MV (\_->return ())) (eval exp)
 --   that are suseptable to tail recursion are reimplimented here.
 evalT ::  Exp -> EvalM ()
 evalT (Apply var args vis) = do
-  (fn, arity, args') <- let
+  (fn, arity, super, args') <- let
                           handler (Err "NotFoundError" msg []) =
                             case var of
                               Var{name = str, scope =[]} -> do
-                                (f,a) <- fnFromVar (simple "method_missing") Public
-                                return (f,a,((EAtom str):args))
+                                (f,a,s) <- fnFromVar (simple "method_missing") Public
+                                return (f,a,s,((EAtom str):args))
                               _ -> do
                                 slf <- gets self
                                 throwError $ Err "MethodMissing" msg [VObject slf]
                           handler err = throwError err
 
                           find = do
-                            (f,a) <- fnFromVar var vis
-                            return (f,a,args)
+                            (f,a,s) <- fnFromVar var vis
+                            return (f,a,s,args)
 
                         in
                           find `catchError` handler
-  apply fn arity args'
+  apply fn arity super args'
 evalT (Call expr msg args) = do
   val <- eval expr
   r <- valToObj val
@@ -258,18 +259,38 @@ evalT (Call expr msg args) = do
       args' <- mapM (liftM EValue . eval) args
       fmap fst $ with receiver $ evalT (Apply (simple msg) args' Public)
     -- TODO: put self back (see issue #28 on github)
+
 evalT (Block exps file) = do
   insertLocalM "__FILE__" $ VString $ mkStringLiteral file
   mapM_ eval (init exps) >> evalT (last exps)
+
 evalT (If pred cons alt) = do
   r <- eval pred
   if r == VNil || r == VFalse then maybe (replyM_ VNil) evalT alt else evalT cons
+
+evalT (ESuper m_args) = do
+  spr <- join $ gets superMethod
+  case spr of
+    Nothing -> throwError $ Err "NoMethodError" "super method not found" []
+    Just mws -> do 
+      (fn, arity) <- mkFunctionFromValue (simple "super") $ mwsValue mws
+      case m_args of
+        Just args -> apply fn arity (runMWS mws) args
+        Nothing -> do
+          m_args' <- gets $ lookupLocals "__args"
+          case m_args' of 
+            Nothing -> apply fn arity (runMWS mws) []
+            Just (VArray arr) -> apply fn arity (runMWS mws) (map EValue $ toList arr)
+            Just (val) -> apply fn arity (runMWS mws) [EValue val]
+
+
 evalT exp = eval exp >>= replyM_  -- General case
 
-apply fn arity args = do
+-- | run the function fn with args
+apply fn arity super args = do
   guardR "Wrong number of arguments." $ checkArity arity $ length args
   vals <- mapM eval args
-  fn vals
+  withSuper super $ fn vals
 
 -- | Given a Var find or create a function to call
 --
@@ -281,19 +302,24 @@ apply fn arity args = do
 -- When we encounter a non-function value, we create a temporary function
 -- which uses the "call" method.  By implimenting this method, any object
 -- can pretend to be a function.
-fnFromVar :: Var -> Visibility-> EvalM (Fn, Arity)
-fnFromVar var vis = do
-  val <- case vis of
-    Private -> do
-      MV _ val' <- lookupVar var
-      return val'
-    Protected -> throwError $ Err "SystemError" "TODO: impliment protected methods" []
-    Public -> lookupMethod $ top var
-  case val of
-    VFunction{function=fn, arity=arity} -> return (fn, arity)
-    (VError (Err err msg vals)) -> throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals
-    VNil  -> throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
-    val -> return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing)) -- fixme
+fnFromVar :: Var -> Visibility-> EvalM (Fn, Arity, Super)
+fnFromVar var Private = do
+  MV _ val <- lookupVar var
+  (fn,arity) <- mkFunctionFromValue var val
+  slf <- gets self
+  return (fn, arity, maybe (searchMethods (top var) slf) (const emptySuper) (bottom var))
+fnFromVar _ Protected = throwError $ Err "SystemError" "TODO: impliment protected methods" []
+fnFromVar var Public = do
+  MWS super val <- lookupMethod $ top var
+  (fn,arity) <- mkFunctionFromValue var val
+  return (fn,arity,super)
+
+-- | Turn a non-function value into a function
+mkFunctionFromValue :: Var -> Value -> EvalM(Fn, Arity)
+mkFunctionFromValue _ VFunction{function=fn, arity=arity} = return (fn, arity)
+mkFunctionFromValue var (VError (Err err msg vals))       = throwError $ Err err (msg ++ "(while looking up function" ++ show var ++ ")") vals
+mkFunctionFromValue var VNil                              = throwError $ Err "NotFoundError" ("Function or Method not found: " ++ show var) []
+mkFunctionFromValue _ val                                 = return (\vals -> evalT (Call (EValue val) "call" (map EValue vals)), (0,Nothing))
 
 -- | The inner workings of Class creation
 --
@@ -375,7 +401,7 @@ mkFunct params exp vals = do
     using (merge ps c) (evalT exp) -- Use evalT for proper tail calls
   where
     assignParams :: [Parameter] -> [Value] -> EvalM [(String,Value)]
-    assignParams [] [] = return []
+    assignParams [] [] = return [("__args",VArray $ A.fromList vals)]
     assignParams [] _ = throwError $ Err "RunTimeError" "Function called with too many arguments" []
     assignParams ((Param str):ps) [] = throwError $ Err "RunTimeError" "Function called with too few arguments" []
     assignParams ((Default str exp):ps) [] = do

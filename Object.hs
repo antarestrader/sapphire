@@ -124,12 +124,19 @@ data Message =
   | Initialize Process -- ^ Set process to Pid and call initialization method
   | Terminate
 
+data MethodWithSuper = MWS {runMWS :: EvalM(Maybe MethodWithSuper), mwsValue:: Value}
+
+type Super = EvalM(Maybe MethodWithSuper)
+
+emptySuper :: Super
+emptySuper = return Nothing
 
 data SearchIn = IVars | CVars | ObjectGraph | ClassGraph | Methods
 
-data Response = Response Value | NothingFound | Error (Err Value)
+data Response = Response Value | ResponseWithSuper MethodWithSuper | NothingFound | Error (Err Value)
 
 responseToValue (Response v) = v
+responseToValue (ResponseWithSuper mws) = mwsValue mws
 responseToValue (NothingFound) = vnil
 responseToValue (Error err) = VError err
 

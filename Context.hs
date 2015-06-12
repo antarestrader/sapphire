@@ -14,7 +14,7 @@
 --   structures.
 
 module Context
-  ( Context( self )
+  ( Context( self, superMethod )
   , modifySelf
   , dispatchC
   , dispatchC_
@@ -24,6 +24,7 @@ module Context
   , tailC, tailM
   , replyM, replyM_
   , with, scope, global
+  , withSuper
   , setScope
   , setGlobal
   , newContext
@@ -55,6 +56,7 @@ data Context = Context
                , self :: Object  -- ^ The object itself
                , scope :: Object  -- ^ The class / module we are in
                , global :: Object -- ^ the global scope refered to by the prefix scope operator (eg `::Foo`) nominally Object
+               , superMethod :: Super
                , continuation :: Continuation
                , responder :: Responder
                }
@@ -64,6 +66,7 @@ newContext obj cont resp = Context
   , self = obj
   , scope = ROOT
   , global = ROOT
+  , superMethod = emptySuper
   , continuation = cont
   , responder = resp
   }
@@ -178,6 +181,15 @@ with obj f = do
   obj' <- gets self
   put ctx
   return (a, obj')
+
+withSuper ::  (MonadState Context m, MonadIO m) => Super -> m a -> m a
+withSuper spr f = do
+  ctx <- get
+  let spr' = superMethod ctx
+  put ctx{superMethod = spr}
+  a <- f
+  modify (\ctx' -> ctx'{superMethod = spr'})
+  return a
 
 -- | update the @self@ object of the current context
 modifySelf ::  (MonadState Context m) => (Object -> Object) -> m ()

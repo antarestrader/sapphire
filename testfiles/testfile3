@@ -9,3 +9,16 @@ class Foo
   def foo
     @qaax + @baz
 
+class Bar <- Foo
+  def to_s
+    "Bar:  bar = #{@bar}; qaax = #{qaax}; @baz=#{baz}."
+
+  def bar(x,y)
+    super
+    @bar = y-x
+
+  
+  def foo
+    puts "fooing"
+    super
+
