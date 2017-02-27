@@ -521,7 +521,7 @@ change because our function is executing.
 My current track to solving this problem is to give every Class (as in the
 Haskell Constructor for Object) a unique ID. This of course requires some global
 source of ID's (random number, monotonically increasing integer, UUIDs) which
-inturn implies some use of the IO monad. One thing to realize is that PIDs are
+in turn implies some use of the IO monad. One thing to realize is that PIDs are
 unique are instances of `Eq` so they can be used to identify a named class or
 module.  However, we have just contructed anonimous modules which do not have in
 independent PID nor even a unique name.
@@ -542,6 +542,43 @@ derived for each funcion call and that it is discarded at the end of the call.
 This *may* be how things work already, but I will need to carefully read my code
 to find out.
 
+## February 27, 2017
+
+Wow, has it really been more than a year since I worked on this project? I
+guess a lot has happened in 2016 including a cancer diagnosis.
+
+I come back to Sapphire with the thought that everything has gotten a little
+complex and that there are not clear deliniations between various aspects of
+the system.  In particular, I would like to seperate the runtime from the more
+primitive evaluation so that it can be reasoned about and tested without code.
+
+In particular I would like a monad with a clear and minimal set of "external"
+functions.  This is my working set:
+
+  * `call`      --  send a message wait ro the response
+  * `spawn`     --  start a new object thread
+  * `getMethod` --  retrieve a method from the class in scope
+  * `error`     --  send an error up the call stack
+  * `return`    --  send a value back to the caller
+
+I would like the runtime system to handle scope, including class, local
+variables, responses, errors and stack mamagement.  In particular, the question
+of defining were a variable or a class or a super class is should be handled
+outside the exicuting code.  Keep `eval` simple and straight forward, leave the
+messy parts to the runtime where it can be more easily tested and resaoned
+about.
+
+This though came up when thinking about how garbage collection might work, and
+the desire to impliment a tow garbage collector on a minimal runtime. As thing
+look now it would be hard seperate Eval from Continuation.  and much of the run
+time is scattered all over the code.
+
+I want to rewrite with some very distinct pieces that interact accros strict
+APIs:
+
+  * Parsing    -- source code to AST
+  * Evaluation -- exicuting the AST for values and effects
+  * Runtime    -- Orginizing object and delivering messages.
 
 [alex-basic]: http://www.haskell.org/alex/doc/html/basic-api.html
 [alex-wrapper]: http://www.haskell.org/alex/doc/html/wrappers.html
