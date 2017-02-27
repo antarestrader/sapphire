@@ -8,7 +8,7 @@ stable program release, but rather a record of thoughts and ideas recorded as
 Sapphire is constructed.
 
 This file is **not** covered under the code or documentation licences.  This
-file, Copyright &copy; 2013, 2014 by John F. Miller, is licenced under is licensed
+file, Copyright &copy; 2013, 2014 by John F. Miller, is licensed
 under a [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
 International License][licence].
 

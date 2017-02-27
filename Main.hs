@@ -32,7 +32,7 @@ parseArgs = do
   args <- getArgs
   case args of
     ["--version"] -> do
-      putStrLn "Sapphire Early Developmet Version.  Copyright 2013,2014,2015 John Miller"
+      putStrLn "Sapphire Early Developmet Version.  Copyright 2013-2017 John Miller"
       exitSuccess
     ("-i":files) -> return (\c -> runFiles c files >>= repl)
     [file] -> return (\c -> runFiles c [file] >> return ())

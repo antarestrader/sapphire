@@ -2,11 +2,11 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 
--- | When evaluation Sapphire code, this structure keeps track of the context
+-- | When evaluating Sapphire code, this structure keeps track of the context
 --   in which the evaluation happens.  More then just a set of local variables,
 --   this structure also tracks the current continuation and abstracts the
 --   complex rules for sending messages and replying to function found in
---   COntinuations.hs into a more managable framework.
+--   Continuations.hs into a more managable framework.
 --
 --   This module is designed to work primarly with functions who embed a
 --   Context structure in a state monad.  The EvalM monad meets this

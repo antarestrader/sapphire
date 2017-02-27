@@ -11,7 +11,7 @@
 --
 --  In order for this to actually be effective, we needed to change function
 --  application from a function takeing a list of values and returning a
---  Monadic value result to a function taking a list of values that has re
+--  Monadic value result to a function taking a list of values that has the
 --  effect (monadic action) of placing a value in the replier TMVar in the
 --  current context.
 --
