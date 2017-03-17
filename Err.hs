@@ -10,6 +10,8 @@ module Err (
   , Error(..)
 ) where
 
+import Data.String
+
 class Error e where
   strMsg :: String -> e
   noMsg :: e
@@ -28,4 +30,7 @@ instance (Show a) => Show (Err a) where
   show (Err typ msg []) = typ ++": "++msg
   show (Err typ msg set) = typ ++": "++msg ++ "\n  " ++ show set
   show (ErrObj obj) = show obj
+
+instance IsString (Err a) where
+  fromString str = strMsg str
 

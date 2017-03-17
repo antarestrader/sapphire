@@ -11,6 +11,7 @@ module String
 
 import qualified Data.Text.Lazy as T
 import Data.Monoid
+import Data.String
 
 data SapString =
    SapString
@@ -25,6 +26,9 @@ instance Eq SapString where
   a == b = text a == text b
 
 stringLength s = fromIntegral $ T.length $ text s
+
+instance IsString SapString where
+  fromString str = mkStringLiteral str
 
 mkStringLiteral ::  String -> SapString
 mkStringLiteral s = SapString { escapes = [], text = T.pack s }

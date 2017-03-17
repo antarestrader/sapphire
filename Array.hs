@@ -8,6 +8,6 @@ module Array (
 import Data.Sequence as S -- from the `containers` library
 import {-# SOURCE #-} Object
 
-type Array = S.Seq Value
+type Array = S.Seq Object
 
 

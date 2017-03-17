@@ -1,12 +1,16 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Hash where
 
 import qualified Data.HashMap.Strict as H --from unordered-containers
 import Data.Hashable
+import GHC.Generics (Generic)
+
 import {-# SOURCE #-} Object
 import Data.List
 
 
-data Hash = Hash {defaultValue :: Value, h :: H.HashMap HKey HValue}
+data Hash = Hash {defaultValue :: Object, h :: H.HashMap HKey HValue}
 
 instance Show Hash where
   show Hash{h=hm} = "{" ++ inner ++ "}"
@@ -17,16 +21,12 @@ data HKey = HKInt Integer
           | HKFloat Double
           | HKString String
           | HKAtom String
-          deriving (Eq, Ord, Show)
+          deriving (Eq, Ord, Show, Generic)
 
-data HValue = HValue{trueValue :: Value, trueKey :: Value}
+data HValue = HValue{trueValue :: Object, trueKey :: Object}
 
 instance Show HValue where
   show (HValue{trueKey = tk, trueValue=tv}) = show tk ++"=>" ++ show tv
 
-instance Hashable HKey where
-  hash (HKInt i) = hashWithSalt 1337 i
-  hash (HKFloat f) = hash f
-  hash (HKString s) = hashWithSalt 1337 s
-  hash (HKAtom s) = hash s
+instance Hashable HKey 
 
