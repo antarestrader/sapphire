@@ -3,6 +3,8 @@
 module Eval.Parameters (
     Parameter(..)
   , match
+  , arity
+  , checkArity
   )
 where
 
@@ -10,7 +12,7 @@ import  Control.Monad.Except
 import Data.String
 import Data.List
 
-import Object
+import Object hiding (arity)
 import Scope
 import Name
 
@@ -53,6 +55,29 @@ match (Pattern cls n next) (x:xs) = do
      otherwise -> throwError "PatternMatchError: Pattern failed" -- todo add information n is not a cls
 match (Alternatives xs) ps = alternatives [] xs ps
 
+arity :: Parameter -> Arity
+arity ps = arity' (0,Just 0) ps
+  where
+    arity' x Empty = x
+    arity' (a,_) (Asterisk _) = (a, Nothing)
+    arity' (a, Just b) (Default _ _ x) = arity' (a,Just (b+1)) x
+    arity' (a, Just b) (P _ x) = arity' (a+1, Just (b+1)) x
+    arity' (a, Just b) (Pattern _ _ x) = arity' (a+1, Just (b+1)) x
+    arity' x (Alternatives []) = x
+    arity'  _ (Alternatives ps) = (a', b')
+      where
+        ps' = map (arity' (0,Just 0)) ps
+        a' = minimum $ map fst ps'
+        b' = foldl max' (Just 0) (map snd ps')
+        max' Nothing _ = Nothing -- Nothing represents no limit (i.e. infinity) so it is the maximal value
+        max' _ Nothing = Nothing
+        max' (Just a) (Just b) = Just (max a b)
+    arity' a (Guard _ x) = arity' a x
+
+checkArity :: Arity -> Int -> Bool
+checkArity (min, Just max) x | (min <= x) && (x <= max) = True
+checkArity (min, Nothing)  x | (min <= x) = True
+checkArity _ _ = False
 
 setLocal ::Scope m => Name -> Object -> m ()
 setLocal n x = setVar Local n x

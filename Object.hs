@@ -92,11 +92,6 @@ mark map = foldMap f map
     f (Process pid) = [pid]
     f _ = []
 
-checkArity :: Arity -> Int -> Bool
-checkArity (min, Just max) x | (min <= x) && (x <= max) = True
-checkArity (min, Nothing)  x | (min <= x) = True
-checkArity _ _ = False
-
 vnil :: Object
 vnil = Nil
 

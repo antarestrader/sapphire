@@ -5,6 +5,7 @@ import Object
 import Err
 import Var
 import AST
+import Name
 import Data.Map as M
 
 guardR :: (Error e, MonadError e m)=> String -> Bool -> m ()

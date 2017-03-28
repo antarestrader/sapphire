@@ -5,19 +5,21 @@ module AST where
 
 import Object(Object)
 import Var
+import Name
+import Eval.Parameters
 
 -- | Primary Abstract Syntax Tree
 data Exp =
     EVar Var -- ^ a possibly scoped variable
   | EInt Integer -- ^ Integer literal
   | EValue Object -- ^ allows values to be "shoved" values back into expressions
-  | EFloat Double -- ^ real number literal
+  | EFloat Double  -- ^ real number literal
   | EString String -- ^ string literal
   | ExString [Exp] -- ^ concat all elements together as a string
-  | EAtom String -- ^ atom literal (:foo)
-  | EArray [Exp] -- ^ an Array Literal
+  | EAtom Name     -- ^ atom literal (:foo)
+  | EArray [Exp]   -- ^ an Array Literal
   | EHash  [(Exp,Exp)] -- ^ a Hash Literal
-  | EIVar String -- ^ Named istance variable (\@foo)
+  | EIVar Name   -- ^ Named istance variable (\@foo)
   | ENil | EFalse | ETrue
     -- | Operator embeded Equation
     --
@@ -29,12 +31,12 @@ data Exp =
   | OpStr Exp [(Op,Exp)]
   | Index Exp [Exp] -- ^ an expression followed by an index (foo[3])
   | Lambda [Parameter] Exp -- ^ an anonymous function declairation
-  | Def String [Parameter] Exp -- ^ a method declairartion
-  | DefSelf String [Parameter] Exp -- ^ a method declairation of the form `def self.xxx`
+  | Def Name [Parameter] Exp -- ^ a method declairartion
+  | DefSelf Name [Parameter] Exp -- ^ a method declairation of the form `def self.xxx`
   | Apply Var [Exp] Visibility -- ^ application of the actual params [Exp] to the function found at var
   | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
-  | Call Exp String [Exp] -- ^ method invocation (foo.bar(x))
-  | Send Exp String [Exp] -- ^ concurrent method invocation (foo->bar(x))
+  | Call Exp Name [Exp] -- ^ method invocation (foo.bar(x))
+  | Send Exp Name [Exp] -- ^ concurrent method invocation (foo->bar(x))
   | ESuper (Maybe [Exp]) -- ^ a call to `super` with or without args
   | Assign LHS Exp -- ^ assignment of a var (see LHS)
   | OpAssign LHS Op Exp -- ^ assign new value based on the old ( a += 12)
@@ -62,14 +64,5 @@ data LHS =
   | LCall Exp String [Exp]
   | LSend Exp String [Exp] deriving Show
 
-data Parameter =
-    Param String
-  | Default String Exp
-  | VarArg String
-    deriving (Show)
 
 data Visibility = Public | Private | Protected deriving (Show, Eq)
-
-getParamName (Param n) = n
-getParamName (VarArg n) = n
-getParamName (Default n _) = n

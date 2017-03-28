@@ -1,6 +1,16 @@
-module Var where
+module Var 
+  ( Var(..)
+  , simple
+  , top
+  , bottom
+  )
+where
 
-data Var = Var {name :: String, scope :: Scope} | Self
+import Name
+
+type Scope = [Name]
+
+data Var = Var {name :: Name, scope :: Scope} | Self
 
 instance Show Var where
   show Self = "self"
@@ -13,7 +23,7 @@ instance Show Var where
 simple :: String -> Var
 simple n = Var {name=n,scope=[]}
 
-top :: Var -> String
+top :: Var -> Name
 top Var {name = n, scope = []} = n
 top Var {scope = (x:xs)} = x
 top Self = "self"
@@ -22,6 +32,4 @@ bottom :: Var -> Maybe Var
 bottom v@(Var{scope=(x:xs)}) = Just v{scope = xs}
 bottom _ = Nothing
 
-type Op = String
 
-type Scope = [String]
