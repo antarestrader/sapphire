@@ -1,3 +1,4 @@
+-- Hash.hs Copyright 2015-17 by John F. Miller
 {-# LANGUAGE DeriveGeneric #-}
 
 module Hash where

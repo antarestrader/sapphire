@@ -1,9 +1,7 @@
--- Err.hs Copyright 2015 by John F. Miller
+-- Err.hs Copyright 2015-17 by John F. Miller
 
 -- | The error data type
---
---   This replaces String as a more detailed error to be thrown within the 
---   EvalM monad.
+
 {-# LANGUAGE FlexibleInstances #-}
 module Err (
     Err(..)

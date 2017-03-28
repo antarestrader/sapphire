@@ -1,16 +1,16 @@
--- Copyright 2013, 2014 John F. Miller
+-- Copyright 2013 - 2017 John F. Miller
 
 -- | Data structures for the Abstract Syntax Tree
 module AST where
 
-import Object(Value)
+import Object(Object)
 import Var
 
 -- | Primary Abstract Syntax Tree
 data Exp =
     EVar Var -- ^ a possibly scoped variable
   | EInt Integer -- ^ Integer literal
-  | EValue Value -- ^ allows values to be "shoved" values back into expressions
+  | EValue Object -- ^ allows values to be "shoved" values back into expressions
   | EFloat Double -- ^ real number literal
   | EString String -- ^ string literal
   | ExString [Exp] -- ^ concat all elements together as a string

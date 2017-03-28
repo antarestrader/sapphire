@@ -1,5 +1,5 @@
--- Copyright 2013, 2014 John F. Miller
-{-# LANGUAGE ScopedTypeVariables #-}
+-- Copyright 2013 - 2017 John F. Miller
+{-# LANGUAGE ScopedTypeVariables, OverloadedStrings,  NamedFieldPuns,#-}
 
 -- | Evaluate the Abstract Syntax Tree expression to produce values within the
 --   the context of the EvalM Monad
@@ -37,11 +37,16 @@ import qualified Data.Map as M
 import Data.Foldable (toList)
 import Data.Maybe
 import Data.Monoid
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.IO.Class
+import Control.Monad.State.Class
+import Control.Exception(try, BlockedIndefinitelyOnSTM)
+
 import AST
 import Err
 import Object
-import Object.Graph
-import Object.Spawn
 import String
 import qualified Array as A
 import Hash
@@ -50,40 +55,21 @@ import Context hiding (scope, global)
 import qualified Context as CTX
 import Var
 import Utils
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.IO.Class
-import Control.Monad.State.Class
-import Control.Exception(try, BlockedIndefinitelyOnSTM)
-import Control.Concurrent.STM.TMVar
 
--- | The moand in which Sapphire code runs.  It contains the Context, handles
---   errors and allows for IO actions in the running program.
-type EvalM a= StateT Context (ExceptT (Err Value) IO) a
 
--- | execute the EvalM action using the provided Context.
-runEvalM :: (EvalM a) -- ^ the action to be run
-         -> Context   -- ^ the context to run it in
-         -> IO (Either (Err Value) (a, Context))
-runEvalM e c = do
-  r <- try $ runExceptT $ runStateT e c
-  case r of
-    Right x -> return x
-    Left (e:: BlockedIndefinitelyOnSTM) -> return $ Left $ Err "ConcurencyError" (show e) []
 
--- |Turns an expression into a value, potentially performing
+-- |Turns an expression into a Object, potentially performing
 --  side effects along the way.
-eval :: Exp -> EvalM Value
+eval :: Exp -> EvalM Object
 eval (EValue val) = return val
-eval (EInt i) = return (VInt i)
-eval (EFloat f) = return (VFloat f)
-eval ENil = return VNil
-eval ETrue = return VTrue
-eval EFalse = return VFalse
-eval (EAtom a) = return (VAtom a)
+eval (EInt i) = return (Prim $ VInt i)
+eval (EFloat f) = return (Prim $ VFloat f)
+eval ENil = return Nil
+eval ETrue = return TrueClass
+eval EFalse = return FalseClass
+eval (EAtom a) = return (Prim $ VAtom a)
 
-eval (EString s) = return $ VString $ mkStringLiteral s
+eval (EString s) = return Prim $ VString $ fromString s
 
 eval (EIVar s) = do
   (MV _ val) <- lookupIVar s

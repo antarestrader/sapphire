@@ -5,17 +5,13 @@ module Object where
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.String
---import Control.Concurrent.STM
---import Control.Concurrent
---import Data.Maybe
 import Data.Foldable (toList)
 
 import String
-import Array (Array)
---import qualified Array as A
+import Name
+import Array (Array, fromList)
 import Hash (Hash)
---import Var
---import qualified Continuation as C
+
 
 import qualified Runtime as R
 import Err
@@ -23,8 +19,7 @@ import Err
 type Runtime = R.Runtime State Object
 type PID = R.PID Object
 type Fn = [Object] -> Runtime Object
-type Arity = (Int,Maybe Int)
-type Namespace a = Map String a
+
 
 data Object = Prim !Primitive
             | Process !PID
@@ -105,6 +100,9 @@ checkArity _ _ = False
 vnil :: Object
 vnil = Nil
 
+vint :: Integer -> Object
+vint = Prim . VInt
+
 verror :: String -> Object
 verror = VError . strMsg
 
@@ -112,6 +110,8 @@ vbool :: Bool -> Object
 vbool True  = TrueClass
 vbool False = FalseClass
 
+varray :: [Object] -> Object
+varray = Prim . VArray . fromList
 
 instance Show Object where
   show (Prim p) = show p
@@ -137,79 +137,5 @@ instance Show Primitive where
   show (VArray a) = show $ toList a
   show (VHash h) = show $ h
 
-{-
-type Precedence = (Int, AssocLR, AssocLR)
 
-data AssocLR = L | R | N deriving (Show,Eq,Ord)
-
-data Object = Pid Process
-            | Object { ivars   :: M.Map String Value  -- ^ instance variables
-                     , klass   :: Object   -- ^ the class of this instance
-		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
-		     , process :: TMVar Process  -- ^ must be a PID pointing to this object
-		     }
-            | Class   {ivars   :: M.Map String Value  -- ^ instance variables
-	             , klass   :: Object   -- ^ the class of this instance (typicall Class)
-		     , modules :: [Object] -- ^ included modules `head` shadows `tail`
-		     , process :: TMVar Process -- ^ must be a PID pointing to this object
-		     , super   :: Object   -- ^ the super-class of this class
-		     , cvars :: M.Map String Value     -- ^ instance methods
-		     , cmodules :: [Object]            -- ^ included class modules
-                     , properName :: String            -- ^ The name in the "global" scope of this class
-		                                       --   possibally empty for anonomous classes.
-		     }
-            | ROOT
-
-instance Eq Object where
-  (Pid a) == (Pid b) = a == b
-  (Pid _) == _ = False
-  ROOT == ROOT = True
-  ROOT == _ = False
-  _ == (Pid _) = False
-  _ == ROOT = False
-  a == b = process a == process b
-
-
-data Message =
-    Execute Var [Value] -- ^ may want ot make this strict in value
-  | Search SearchIn String
-  | SetIVar String Value
-  | SetCVar String Value
-  | PushModule Value
-  | PushCModule Value
-  | Eval Exp
-  | Initialize Process -- ^ Set process to Pid and call initialization method
-  | Terminate
-
-data MethodWithSuper = MWS {runMWS :: EvalM(Maybe MethodWithSuper), mwsValue:: Value}
-
-type Super = EvalM(Maybe MethodWithSuper)
-
-emptySuper :: Super
-emptySuper = return Nothing
-
-data SearchIn = IVars | CVars | ObjectGraph | ClassGraph | Methods
-
-data Response = Response Value | ResponseWithSuper MethodWithSuper | NothingFound | Error (Err Value)
-
-responseToValue (Response v) = v
-responseToValue (ResponseWithSuper mws) = mwsValue mws
-responseToValue (NothingFound) = vnil
-responseToValue (Error err) = VError err
-
-type Continuation = C.Continuation Message Response
-type Process = C.ProcessId Message Response
-type Replier = C.Replier Response
-type Responder = C.Responder Object Message Response
-
-thread :: Object -> IO String  -- for debugging purposes only
-thread (Pid pid) = return $ show $ fst pid
-thread ROOT = return "ROOT"
-thread obj = do
-  pro <- atomically $ tryTakeTMVar $ process obj
-  case pro of
-    Nothing -> myThreadId >>= return . show
-    Just pid -> return $ show $ fst pid
-
--}
 

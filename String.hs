@@ -1,4 +1,4 @@
--- String.hs Copyright 2014 John F. Miller
+-- String.hs Copyright 2014-17 John F. Miller
 
 -- | String data and functions
 

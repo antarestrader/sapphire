@@ -1,4 +1,4 @@
--- Array.hs Copyright 2014 John F. Miller
+-- Array.hs Copyright 2014-2017 John F. Miller
 
 module Array (
   module S
