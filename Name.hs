@@ -9,4 +9,10 @@ type Arity = (Int,Maybe Int)
 type Namespace a = Map Name a
 type Precedence = (Int, AssocLR, AssocLR)
 
+data Position = Position 
+  { filename :: FilePath
+  , lineNo :: Integer
+  , offset :: Integer
+  } deriving Show
+
 data AssocLR = L | R | N deriving (Show,Eq,Ord)

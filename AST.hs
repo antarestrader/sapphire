@@ -9,7 +9,8 @@ import Name
 import Eval.Parameters
 
 -- | Primary Abstract Syntax Tree
-data Exp =
+data Exp = Exp {node::Node, position::Position} deriving Show
+data Node =
     EVar Var -- ^ a possibly scoped variable
   | EInt Integer -- ^ Integer literal
   | EValue Object -- ^ allows values to be "shoved" values back into expressions
@@ -58,11 +59,11 @@ data Exp =
 --   CVars, indexed vars, and method calls (via the foo= convention).
 data LHS =
     LVar  Var
-  | LIVar String
-  | LCVar String
+  | LIVar Name
+  | LCVar Name
   | LIndex Exp [Exp]
-  | LCall Exp String [Exp]
-  | LSend Exp String [Exp] deriving Show
+  | LCall Exp Name [Exp]
+  | LSend Exp Name [Exp] deriving Show
 
 
 data Visibility = Public | Private | Protected deriving (Show, Eq)
