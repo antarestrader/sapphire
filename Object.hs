@@ -9,8 +9,8 @@ import Data.Foldable (toList)
 
 import String
 import Name
-import Array (Array, fromList)
-import Hash (Hash)
+import Object.Array
+import Object.Hash (Hash(..))
 
 
 import qualified Runtime as R
@@ -26,7 +26,7 @@ data Object = Prim !Primitive
             | TrueClass
             | FalseClass
             | Nil
-            | VFunction {function:: Fn, arity::Arity}
+            | VFunction {function:: Fn, arity::Arity, fUID::UID}
             | Object State
             | VError !(Err Object)
 
@@ -55,6 +55,7 @@ data State =
       , localNamespace  :: PID
       , localCache :: Namespace Fn
       , primitive  :: Maybe Primitive
+      , uid :: UID
       }
   | Class {
         ivars :: Namespace Object
@@ -66,6 +67,7 @@ data State =
       , methods     :: Namespace Fn
       , methodCache :: Namespace Fn
       , modules     :: [PID]
+      , uid :: UID
       }
   | Module {
         ivars :: Namespace Object
@@ -75,16 +77,54 @@ data State =
       , localCache   :: Namespace Fn
       , methods      :: Namespace Fn
       , childModules :: Namespace PID
+      , uid :: UID
       }
 
 instance R.StateClass State Object where
   -- markState :: State -> [PID]
-  markState Instance{ivars, instanceOfClass, globalNamespace, localNamespace} = 
-      return (instanceOfClass:globalNamespace:localNamespace:(mark ivars))
-  markState Class{ivars, instanceOfClass, globalNamespace, localNamespace, superClass, modules} = 
-      return $ (instanceOfClass:globalNamespace:localNamespace:superClass:(mark ivars)) ++ modules
-  markState Module{ivars, instanceOfClass, globalNamespace, localNamespace, childModules} = 
-      return $ (instanceOfClass:globalNamespace:localNamespace:(mark ivars)) ++ M.elems childModules
+  markState 
+    Instance {
+        ivars
+      , instanceOfClass
+      , globalNamespace
+      , localNamespace
+      } = 
+        return 
+          (   instanceOfClass
+            : globalNamespace
+            : localNamespace
+            : (mark ivars)
+          )
+  markState 
+    Class {
+        ivars
+      , instanceOfClass
+      , globalNamespace
+      , localNamespace
+      , superClass
+      , modules
+      } = 
+        return $ 
+          (   instanceOfClass
+            : globalNamespace
+            : localNamespace
+            : superClass
+            : (mark ivars)
+          ) ++ modules
+  markState 
+    Module {
+        ivars
+      , instanceOfClass
+      , globalNamespace
+      , localNamespace
+      , childModules
+      } = 
+        return $ 
+          (   instanceOfClass
+            : globalNamespace
+            : localNamespace
+            : (mark ivars)
+          ) ++ M.elems childModules
 
 mark map = foldMap f map
   where
@@ -98,6 +138,9 @@ vnil = Nil
 vint :: Integer -> Object
 vint = Prim . VInt
 
+vfloat :: Double -> Object
+vfloat = Prim . VFloat
+
 verror :: String -> Object
 verror = VError . strMsg
 
@@ -105,17 +148,20 @@ vbool :: Bool -> Object
 vbool True  = TrueClass
 vbool False = FalseClass
 
-varray :: [Object] -> Object
-varray = Prim . VArray . fromList
+getUID :: Object -> Maybe UID
+getUID (Object obj) = Just $ uid obj
+getUID (Prim (VHash (Hash{hUID})))  = Just hUID
+getUID (VFunction{fUID}) = Just fUID
+getUID _ = Nothing
 
 instance Show Object where
   show (Prim p) = show p
   show TrueClass = "true"
   show FalseClass = "false"
   show Nil = "nil"
-  show (VFunction _ (a,Just b)) | a == b = "<function: ("++show a++")>"
-  show (VFunction _ (a,Just b)) = "<function: ("++show a++", "++show b++")>"
-  show (VFunction _ (a,Nothing)) = "<function: ("++show a++" ...)>"
+  show (VFunction _ (a,Just b) _) | a == b = "<function: ("++show a++")>"
+  show (VFunction _ (a,Just b) _) = "<function: ("++show a++", "++show b++")>"
+  show (VFunction _ (a,Nothing)_ ) = "<function: ("++show a++" ...)>"
   show (Process p) = "<PID "++ show p ++">"
   show (VError e) = show e
   show (Object ROOT) = "ROOT"

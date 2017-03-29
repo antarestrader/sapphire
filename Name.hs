@@ -1,9 +1,11 @@
 module Name (module Name, Map) where
 
 import Data.Map.Strict (Map)
+import Data.Word
 
 type Name = String
 type Op = String
+type UID = Word32
 type PrecedenceTable = Map Op Precedence
 type Arity = (Int,Maybe Int)
 type Namespace a = Map Name a

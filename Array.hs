@@ -1,13 +1,17 @@
--- Array.hs Copyright 2014-2017 John F. Miller
-
 module Array (
-  module S
-, Array
+    module Object.Array
+  , module S
+  , varray
+  , vEmptyArray
 ) where
 
-import Data.Sequence as S -- from the `containers` library
-import {-# SOURCE #-} Object
+import Data.Sequence as S
 
-type Array = S.Seq Object
+import Object.Array
+import Object
 
+varray :: [Object] -> Object
+varray = Prim . VArray . S.fromList
+
+vEmptyArray = Prim $ VArray S.empty 
 

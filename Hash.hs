@@ -1,33 +1,69 @@
--- Hash.hs Copyright 2015-17 by John F. Miller
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings,  NamedFieldPuns #-}
 
-module Hash where
+module Hash (
+    module Object.Hash
+  , vhash
+  , insert
+  , index
+  , keys
+  , values
+  , toArray
+  ) where
 
-import qualified Data.HashMap.Strict as H --from unordered-containers
-import Data.Hashable
-import GHC.Generics (Generic)
+import Data.Foldable (toList)
+import qualified Data.HashMap.Strict as H
 
-import {-# SOURCE #-} Object
-import Data.List
+import Object
+import Object.Hash
+import String
+import Err
+import qualified Array as A
 
+hkey :: Object -> HKey
+hkey (Prim (VInt i)) = HKInt i
+hkey (Prim (VString ss)) = HKString $ string ss
+hkey (Prim (VFloat f)) = HKFloat f
+hkey (Prim (VAtom s)) = HKAtom s
+hkey (Prim (VArray a)) = HKArray (map hkey (toList a))
+-- hkey (Prim (VHash hash)) = HKHash $ hUID hash
+hkey (Process pid) = HKProcess $ show pid
+hkey (TrueClass) = HKTrue
+hkey (FalseClass) = HKFalse
+hkey (Nil) = HKNil
+hkey (VFunction{fUID}) = HKFunction fUID
+hkey (Object obj) = HKObject (uid obj)
+hkey (VError (ErrObj a)) = HKError (hkey a)
+hkey (VError (Err a b _)) = HKErr a b
+hkey o = case getUID o of 
+  Just u  -> HKSpecial u
+  Nothing -> HKSpecial 0
 
-data Hash = Hash {defaultValue :: Object, h :: H.HashMap HKey HValue}
+vhash :: [(Object,Object)] -> Object
+vhash lst = Prim $ VHash $ Hash{defaultValue = Nil, h=hsh, hUID=0} 
+  where
+    hsh = H.fromList (map (\(k,v)-> mkKeyValue k v) lst)
 
-instance Show Hash where
-  show Hash{h=hm} = "{" ++ inner ++ "}"
-    where
-      inner = intercalate ", " $ map show (H.elems hm)
+insert :: Object -> Object -> Hash -> Hash
+insert k v hsh@Hash{h} = hsh{h=h'}
+  where
+    h' = H.insert k' v' h
+    (k',v') = mkKeyValue k v
 
-data HKey = HKInt Integer
-          | HKFloat Double
-          | HKString String
-          | HKAtom String
-          deriving (Eq, Ord, Show, Generic)
+index :: Object -> Hash -> Object
+index k (Hash{defaultValue,h}) = case (H.lookup (hkey k) h) of
+  Nothing -> defaultValue
+  Just (HValue{trueValue}) -> trueValue
 
-data HValue = HValue{trueValue :: Object, trueKey :: Object}
+keys :: Hash -> Object
+keys Hash{h} = A.varray $ map trueKey (H.elems h)
 
-instance Show HValue where
-  show (HValue{trueKey = tk, trueValue=tv}) = show tk ++"=>" ++ show tv
+values :: Hash -> Object
+values Hash{h} = A.varray $ map trueValue (H.elems h)
 
-instance Hashable HKey 
+toArray :: Hash -> Object
+toArray Hash{h} = A.varray $ map 
+   (\(HValue{trueKey, trueValue}) -> A.varray [trueKey,trueValue])
+   (H.elems h)
 
+mkKeyValue :: Object -> Object -> (HKey, HValue)
+mkKeyValue trueKey trueValue = (hkey trueKey, HValue{trueKey,trueValue})
