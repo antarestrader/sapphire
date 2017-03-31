@@ -108,6 +108,7 @@ parseFile fp = (parseCode fp) `fmap` readFile fp
 
 -- Private functions and data below:
 
+-- The state for our simple parser
 data LParserState = LPS
   { fileName        :: FilePath
   , input'          :: [String] -- lines to be parsed
@@ -115,8 +116,13 @@ data LParserState = LPS
   , currentLineNum' :: LineNo
   }
 
+-- A state monad in which to run our line parsing
 type LParser a = State LParserState a
 
+-- Pull the "next" text line off of this stack, and turn it into a Line. 
+-- If there is a `nextline` that has been pushed back onto the top of the
+-- stack return it instead.  Also keep the currentLineNum' counter up to date.
+-- This does not add a block to the line; that comes later.
 getLine :: LParser (Maybe Line)
 getLine = do
   s <- get
@@ -130,11 +136,17 @@ getLine = do
       return $ Just l
     (Nothing, []) -> return Nothing
 
+-- This line (and its accompanying block) actually belong with the next
+-- lines so push it back onto the top of the stack.
 ungetLine :: Line -> LParser ()
 ungetLine l = do
   s <- get
   put s {nextLine' = Just l}
 
+
+-- Get a line from the stack and deside whether it is more, less or
+-- the same indentation as the given Offset `i`. In the case that there
+-- is nothing more on the stack return Nothing instead
 compareLine :: Offset -> LParser (Maybe (Line,Ordering))
 compareLine i = do
   maybe_l <- getLine
@@ -143,53 +155,87 @@ compareLine i = do
     Just l@(BlankLine _) -> return $ Just (l,EQ)
     Just l -> return $ Just (l, compare (offset l) i )
 
+
+-- Using the next line as the starting point, grab a set of equally indented
+-- lines and put them together into a block.
 parseLines ::  LParser CodeBlock
 parseLines  = do
   l' <- getLine
   case l' of
     Nothing -> error "parse lines called with nothing in buffer"
-    Just l@(BlankLine _) -> parseLines >>= (return . prependLine l) -- ignore blank line
+    Just l@(BlankLine _) -> -- For a blank line parse the rest of the block
+                            -- then put a blank line back at the top. 
+        parseLines >>= (return . prependLine l) 
     Just l -> parseLines' (lineNo l) (offset l) [l]
 
+-- Helper function builds a list of lines in reverse order then turns them 
+-- into a block when a less indented line (or EOF) is found.
 parseLines' :: LineNo -> Offset -> [Line] -> LParser CodeBlock
 parseLines' s i ls = do
   c <- compareLine i
   case c of
     Nothing -> mkBlock s i (reverse ls)  -- no input text left
     Just (l,EQ) -> parseLines' s i (l:ls) -- just another line in the same block
-    Just (l,GT) -> do -- a further indent
-      ungetLine l
-      blk <- parseLines
-      parseLines' s i (addBlockToHead blk ls) -- put this block into the most recent line.
-    Just (l,LT) -> ungetLine l >> mkBlock s i (reverse ls)  -- end of block founds
+    Just (l,GT) -> do -- a further indent; start a new block
+      ungetLine l -- this will be the first line of the new block
+      blk <- parseLines -- make the new black
+      -- put this block into the most recent line.
+      parseLines' s i (addBlockToHead blk ls) 
+    Just (l,LT) ->  -- the block ends because the next line is less indented 
+                    -- than the this set reverse the list and make a new block
+                    -- from it.
+      ungetLine l >> mkBlock s i (reverse ls)
 
+-- Make a Code Block from a list of lines using the filename in the parser state.
 mkBlock :: LineNo -> Offset -> [Line]  -> LParser CodeBlock
 mkBlock sl i ls = do
   fn <- gets fileName
   return Block {lines = ls, startLine = sl, indent = i, filename = fn}
 
+
+-- Helper Function for `parseLines'`.  Puts the CodeBlock into the first line
+-- of the list.  This list is the lines **IN REVERSE ORDER** as is used in
+-- `parseLines'`.  There are some edge cases when then line in question
+-- already has a block, or the line above is blank. Becasue of the way
+-- `parseLines'` is written, this function can never be called on an empty
+-- list.
 addBlockToHead :: CodeBlock -> [Line] -> [Line]
+
 -- If the most recently pushed line is blank, it does not have a block field.
--- instead, make the blank line part of the block and add the block to the line above
+-- Instead, make the blank line part of the block and add the block to the
+-- line above
 addBlockToHead blk (l@(BlankLine _):ls) = addBlockToHead (pushLine blk l) ls
   where
     pushLine blk@Block{lines=ls} l@(BlankLine ln) = blk{lines = l:ls, startLine = ln}
+
+-- The standard case
 addBlockToHead blk (l:ls) = case (block l) of
-  Nothing ->  let l' = l {block = Just blk} in (l':ls)
-  Just existing -> -- There was already a block. (implies negitive indentation) Create a psudo Line containing no text
+  Nothing -> ((l{block = Just blk}):ls) 
+  Just existing -> -- There was already a block. (implies negitive 
+                   -- indentation) Create a psudo Line containing no text
                    -- but only the block as the first line of the outer block.
-    let l'   = Line { line = "", offset = indent blk, lineNo = startLine existing, block = Just existing}
-	blk' = prependLine l' blk
-	l''  = l { block = Just blk'}
+    let l'   = Line { 
+                      line = ""
+                    , offset = indent blk
+                    , lineNo = startLine existing
+                    , block = Just existing
+                    }
+        blk' = prependLine l' blk
+        l''  = l { block = Just blk'}
     in  (l'':ls)
 
+-- Add a line to the front of a block. This is used to place a negitavly 
+-- indented CodeBlock at the front of the existing code block, and to place
+-- blank lines at the top of a code block.
 prependLine :: Line -> CodeBlock -> CodeBlock
 prependLine l bk = bk {lines = (l:(lines bk)), startLine = lineNo' l} where
   lineNo' (BlankLine l) = l
   lineNo' l = lineNo l
 
+-- | Remove the leading spaces from a line
 stripLine :: LineNo -> [Char]  -> Line
 stripLine = stripLine' 0 where
   stripLine' _ l [] = BlankLine l
   stripLine' i l (' ':cs) = stripLine' (i+1) l cs
+  stripLine' i l ('\t':cs) = error $ printf "illegal TAB charactor at line %d:%d" l i
   stripLine' i l cs = Line {line = cs, lineNo = l, offset = i, block = Nothing}
