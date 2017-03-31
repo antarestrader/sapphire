@@ -32,7 +32,7 @@ data HKey = HKInt Integer
           | HKTrue | HKFalse | HKNil
           | HKObject UID
           | HKFunction UID
-          | HKHash UID
+          | HKHash HKey
           | HKArray [HKey]
           | HKError HKey
           | HKErr String String

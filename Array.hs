@@ -14,4 +14,3 @@ varray :: [Object] -> Object
 varray = Prim . VArray . S.fromList
 
 vEmptyArray = Prim $ VArray S.empty 
-

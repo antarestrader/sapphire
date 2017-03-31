@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings,  NamedFieldPuns #-}
-
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns#-}
 module Hash (
     module Object.Hash
   , vhash
@@ -25,7 +25,7 @@ hkey (Prim (VString ss)) = HKString $ string ss
 hkey (Prim (VFloat f)) = HKFloat f
 hkey (Prim (VAtom s)) = HKAtom s
 hkey (Prim (VArray a)) = HKArray (map hkey (toList a))
--- hkey (Prim (VHash hash)) = HKHash $ hUID hash
+hkey (Prim (VHash hash)) = HKHash $ hkey $ toArray hash
 hkey (Process pid) = HKProcess $ show pid
 hkey (TrueClass) = HKTrue
 hkey (FalseClass) = HKFalse
