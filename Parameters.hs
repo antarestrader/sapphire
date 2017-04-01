@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Eval.Parameters (
+module Parameters (
     Parameter(..)
   , match
   , arity
@@ -13,6 +13,7 @@ import Data.String
 import Data.List
 
 import Object hiding (arity)
+import Array
 import Scope
 import Name
 
@@ -39,21 +40,29 @@ instance Show Parameter where
       show' (Pattern cls n Empty) =cls++" "++n++")"
       show' (Pattern cls n x) =cls++" "++n++", " ++ show' x
 
-match :: Scope m => Parameter -> [Object] -> m ()
-match Empty [] = return ()
-match Empty xs = throwError "PatternMatchError: Too many parameters"
-match (P _ _) [] = throwError "PatternMatchError: Too few parameters"
-match (P n next) (x:xs) = setLocal n x >> match next xs
-match (Asterisk n) xs = setLocal n (varray xs) >> return ()
-match (Default n _ next) (x:xs) = setLocal n x >> match next xs
-match (Default n x next) [] = setLocal n x >> match next []
-match (Pattern _ _ _) [] = throwError "PatternMatchError: Too few parameters"
-match (Pattern cls n next) (x:xs) = do
-  r <- call (Just $ RO x) "kind_of" [fromString cls]
-  case (obj r) of 
-     TrueClass -> setLocal n x >> match next xs
-     otherwise -> throwError "PatternMatchError: Pattern failed" -- todo add information n is not a cls
-match (Alternatives xs) ps = alternatives [] xs ps
+match :: Scope m => Parameter -> [Object] -> m (Int)
+match = match' 0
+  where
+    match' :: Scope m => Int -> Parameter -> [Object] -> m (Int)
+    match' i Empty [] = return i
+    match' _ Empty xs = throwError "PatternMatchError: Too many parameters"
+    match' _ (P _ _) [] = throwError "PatternMatchError: Too few parameters"
+    match' i (P n next) (x:xs) = setLocal n x >> match' i next xs
+    match' i (Asterisk n) xs = setLocal n (varray xs) >> return i
+    match' i (Default n _ next) (x:xs) = setLocal n x >> match' i next xs
+    match' i (Default n x next) [] = setLocal n x >> match' i next []
+    match' _ (Pattern _ _ _) [] = throwError "PatternMatchError: Too few parameters"
+    match' i (Pattern cls n next) (x:xs) = do
+      r <- call (Just $ RO x) "kind_of" [fromString cls]
+      case (o r) of 
+         TrueClass -> setLocal n x >> match' i next xs
+         otherwise -> throwError "PatternMatchError: Pattern failed" -- todo add information n is not a cls
+    match' i (Alternatives xs) ps = alternatives i [] xs ps
+  
+    alternitives :: Scope m => Int -> [Object] -> [Parameter] -> [Object] -> m ()
+    alternitives _ errs [] _ = throwError $ varray ("PatternMatchError: No matching pattern":errs)
+    alternatives i [] [p] ps = match' i p ps
+    alternatives i errs (x:xs) ps = match' i x ps `catchError` (\err -> alternatives (i+1) (err:errs) xs ps)
 
 arity :: Parameter -> Arity
 arity ps = arity' (0,Just 0) ps
@@ -82,8 +91,5 @@ checkArity _ _ = False
 setLocal ::Scope m => Name -> Object -> m ()
 setLocal n x = setVar Local n x
 
-alternitives :: Scope m => [Object] -> [Parameter] -> [Object] -> m ()
-alternitives errs [] _ = throwError $ varray ("PatternMatchError: No matching pattern":errs)
-alternatives [] [p] ps = match p ps
-alternatives errs (x:xs) ps = match x ps `catchError` (\err -> alternatives (err:errs) xs ps)
+
 

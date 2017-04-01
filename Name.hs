@@ -18,3 +18,6 @@ data Position = Position
   } deriving Show
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
+data Visibility = Public | Private | Protected deriving (Show, Eq)
+data Order = Append | Prepend | Overwrite
+

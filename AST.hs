@@ -1,19 +1,19 @@
 -- Copyright 2013 - 2017 John F. Miller
-
+{-# LANGUAGE ScopedTypeVariables, OverloadedStrings, RankNTypes,  NamedFieldPuns #-}
 -- | Data structures for the Abstract Syntax Tree
 module AST where
 
-import Object(Object)
+import Scope (Value, Scope)
 import Var
 import Name
-import Eval.Parameters
+import Parameters
 
 -- | Primary Abstract Syntax Tree
-data Exp = Exp {node::Node, position::Position} deriving Show
+data Exp = Exp {node::Node, position::Position} -- deriving Show
 data Node =
-    EVar Var -- ^ a possibly scoped variable
-  | EInt Integer -- ^ Integer literal
-  | EValue Object -- ^ allows values to be "shoved" values back into expressions
+    EValue (forall m. Scope m => Value m) -- ^ allows values to be "shoved" back into expressions
+  | EVar Var -- ^ a possibly scoped variable
+  | EInt Integer -- ^ Integer literal 
   | EFloat Double  -- ^ real number literal
   | EString String -- ^ string literal
   | ExString [Exp] -- ^ concat all elements together as a string
@@ -31,26 +31,32 @@ data Node =
     --   in Eval.hs.
   | OpStr Exp [(Op,Exp)]
   | Index Exp [Exp] -- ^ an expression followed by an index (foo[3])
-  | Lambda [Parameter] Exp -- ^ an anonymous function declairation
-  | Def Name [Parameter] Exp -- ^ a method declairartion
-  | DefSelf Name [Parameter] Exp -- ^ a method declairation of the form `def self.xxx`
-  | Apply Var [Exp] Visibility -- ^ application of the actual params [Exp] to the function found at var
-  | ApplyFn Exp [Exp] -- ^ application of the actual params [Exp] to the function derived from Exp
+  | Lambda Parameter [Exp] -- ^ an anonymous function declairation
+  | Def Visibility Order Name Parameter [Exp] -- ^ a method declairartion
+    -- | a method declairation of the form `def self.xxx`
+  | DefSelf Visibility Order Name Parameter [Exp]
+    -- | application of the actual params [Exp] to the function found at var
+  | Apply Var [Exp] Visibility
+    -- ^ application of the actual params [Exp] to the function derived 
+    --   from Exp
+  | ApplyFn Exp [Exp]
   | Call Exp Name [Exp] -- ^ method invocation (foo.bar(x))
   | Send Exp Name [Exp] -- ^ concurrent method invocation (foo->bar(x))
   | ESuper (Maybe [Exp]) -- ^ a call to `super` with or without args
   | Assign LHS Exp -- ^ assignment of a var (see LHS)
   | OpAssign LHS Op Exp -- ^ assign new value based on the old ( a += 12)
+    -- | conditional expression if the predicate is not false or nil evaluate
+    --   the consequent otherwise evaluate the alternate.
   | If {predicate :: Exp,consequent :: Exp ,alternate :: Maybe Exp}
-  | While Exp Exp
-  | Until Exp Exp
+  | While Exp Exp -- ^ evaluate the second Exp while the first is true
+  | Until Exp Exp -- ^ evaluate the second Exp until the first becomes true
     -- | Build a new class or reopen and existing one at Var with (Maybe Var)
     --   as super class.  the Exp will be run in the in the context of the
     --   class.
   | EClass Var (Maybe Var) Exp
   | Module Var Exp -- ^ Create or reopen a module
-  | Block [Exp] FilePath -- ^ A block of sequential expressions.
-    deriving Show
+  | Block [Exp]-- ^ A block of sequential expressions.
+    -- deriving Show
 
 -- | Left Hand Side data structure
 --
@@ -63,7 +69,5 @@ data LHS =
   | LCVar Name
   | LIndex Exp [Exp]
   | LCall Exp Name [Exp]
-  | LSend Exp Name [Exp] deriving Show
+  | LSend Exp Name [Exp] -- deriving Show
 
-
-data Visibility = Public | Private | Protected deriving (Show, Eq)

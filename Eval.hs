@@ -1,19 +1,8 @@
 -- Copyright 2013 - 2017 John F. Miller
-{-# LANGUAGE ScopedTypeVariables, OverloadedStrings,  NamedFieldPuns,#-}
+{-# LANGUAGE ScopedTypeVariables, OverloadedStrings,  NamedFieldPuns #-}
 
 -- | Evaluate the Abstract Syntax Tree expression to produce values within the
---   the context of the EvalM Monad
---
---  In sapphire this is accomplished by a rather bastardized version of
---  continuation passing style.  In our case continuations are a datastructure
---  (found in Continuation.hs) that holds a (TMVar Value).  This is the
---  equivelent of the return site in traditionla CPS.
---
---  In order for this to actually be effective, we needed to change function
---  application from a function takeing a list of values and returning a
---  Monadic value result to a function taking a list of values that has the
---  effect (monadic action) of placing a value in the replier TMVar in the
---  current context.
+--   the context of a Scope Monad.
 --
 --  In point of fact most of `eval` is simple translation from Exp to Value.
 --  There are also occasions when we need an actual value to be returned.  for
@@ -25,7 +14,6 @@
 --  call where proper tail calls are in order evalT reimpliments them.
 
 module Eval (
-    EvalM
   , Err
   , runEvalM
   , eval
@@ -33,82 +21,130 @@ module Eval (
   )
 where
 
-import qualified Data.Map as M
+-- import qualified Data.Map as M
 import Data.Foldable (toList)
 import Data.Maybe
-import Data.Monoid
+-- import Data.Monoid
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.IO.Class
-import Control.Monad.State.Class
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 import AST
+import Scope
+import Parameters as P
 import Err
 import Object
 import String
 import qualified Array as A
 import Hash
-import Builtin.Hash
-import Context hiding (scope, global)
-import qualified Context as CTX
+-- import Builtin.Hash
+-- import Context hiding (scope, global)
+-- import qualified Context as CTX
 import Var
 import Utils
 
+evalArgs :: [Exp] -> [Object]
+evalArgs args = mapM eval args >>= (return . map o)
 
-
--- |Turns an expression into a Object, potentially performing
+-- |Turns an expression into a Value, potentially performing
 --  side effects along the way.
-eval :: Exp -> EvalM Object
-eval (EValue val) = return val
-eval (EInt i) = return (Prim $ VInt i)
-eval (EFloat f) = return (Prim $ VFloat f)
-eval ENil = return Nil
-eval ETrue = return TrueClass
-eval EFalse = return FalseClass
-eval (EAtom a) = return (Prim $ VAtom a)
+eval :: Scope m => Exp -> m (Value m)
 
-eval (EString s) = return Prim $ VString $ fromString s
+-- eval (EValue val) = return val
+eval (EVar Self) = self
+eval (EVar Var {name, varscope = []) = maybe (v Nil) <$> readVar Local name
+eval (EVar Var var) = maybe (v Nil) <$> findVar var
+eval (EInt i) = return $ v (Prim $ VInt i)
+eval (EFloat f) = return $ v (Prim $ VFloat f)
+eval (EString s) = return $ v $ Prim $ VString $ fromString s
+eval (ExString xs) = do
+    vals <- evalArgs xs
+    concatenate vals ""
+  where
+    concatenate :: [Value] -> SapString -> m (Value m)
+    concatenate [] ss = return $ v $ Prim $ VString ss
+    concatenate (v:vs) ss = do
+        s  <-vToStr v
+        ss' <- ss `sconcat` s
+        concatenate ss' vs
 
-eval (EIVar s) = do
-  (MV _ val) <- lookupIVar s
-  return val
+    vToStr :: Scope m => Object -> m SapString
+    vToStr (Prim (VString s)) = return s
+    vToStr obj = call (Just $ v obj) "to_s" [] >>= vToStr
 
-eval (EVar var) = do
-  (MV _ val) <- lookupVar var
-  return val
+eval (EAtom a) = return $ v (Prim $ VAtom a)
+eval (EArray []) = return $ v $ Prim $ VArray $ A.empty
+eval (EArray xs) = do
+  x's <-  evalArgs xs
+  return $ v varray x's
 
+eval (EHash xs) = do
+  let f (a,b) = do
+        a' <- o <$> eval a
+        b' <- o <$> eval b
+        return (a',b')
+  x's <- mapM f xs
+  return $ v $ vhash x's
+
+eval (EIVar name) =  maybe (v Nil) <$> readVar IVar name
+eval ENil = return (v Nil)
+eval ETrue = return (v TrueClass)
+eval EFalse = return (v FalseClass)
 eval (OpStr a ops) = do
-  c <- get
-  eval (shunt (precedence c) [a] [] ops)
-
-eval (Assign lhs exp) = do
-  val <- eval exp
-  insertLHS lhs val
-  return val
-
-eval (Call expr msg args) = do
-  (MV f val) <- evalWithContext expr
-  r <-  valToObj val
-  case r of
-    Pid pid -> do
-      vals <- mapM eval args
-      (fmap responseToValue) $ dispatchM pid (Execute (simple msg) vals)
-    receiver -> do
-      args' <- mapM (liftM EValue . eval) args
-      (result, obj') <- with receiver $ eval (Apply (simple msg) args' Public)
-      f $ VObject obj' -- update self
-      return result
+  pt <- presidenceTable
+  eval (shunt pt [a] [] ops)
 
 eval (Index expr args) = do
   val <- eval expr
-  idxs <- mapM eval args
-  case (val,idxs) of
-    (VArray a, [VInt i]) | i >= 0 -> return (if ((fromInteger i) < A.length a) then a `A.index` fromInteger i else VNil)
-    (v,xs) -> eval (Call (EValue v) "[]" $ map EValue xs)
+  idxs <- evalArgs args
+  case (o val,idxs) of
+    (Prim (VArray a), [Prim (VInt i)]) | i >= 0 ->
+        return (
+            if (fromInteger i) < A.length a
+              then a `A.index` fromInteger i
+              else VNil
+          )
+    (_,xs) -> call (Just val) "[]" xs
 
-eval ast@(Apply _ _ _) = (fmap responseToValue) $ extract $ evalT ast
+eval (Lambda params exp) = do
+  uid <- nextUID
+  return $ v
+    ( VFunction
+        { function = (mkFunct params exp)
+        , arity = P.arity params
+        , fUID = uid
+        }
+    )
+
+eval (Def vis ord name params exps) = 
+  defMethod vis ord name (match params) (map evalT exps) -- TODO: This does not allow for optimization. We need the AST.
+
+eval (Apply var args vis) = undefined --TODO 
+ -- this can mean three things
+ --  1) this is a local method call; call it
+ --  2) this is a Lambda function; apply it 
+ --  3) this is a non-function object;  call the method "call" on it
+
+eval (Call expr msg args) = do
+  target <- eval expr
+  xs <- evalArgs args
+  call (Just target) msg xs
+
+eval (Assign lhs exp) = eval exp >>=(\val -> assign lhs (o val) >> return val)
+  where
+    assign :: LHS -> Object -> m ()
+    assign (LVar ( Var {name, varscope = [])) = setVar Local name
+    assign (LVar var) obj = do
+      lhs <-  findVar
+      replace lhs obj
+    assign (LIVar name) = setVar IVar name
+    assign (LCVar name) = setVar CVar name
+
+ -- ==================================================================
+
+
+
+
 
 eval (ApplyFn fnExp args) = do
   fn <- eval fnExp
@@ -117,7 +153,7 @@ eval (ApplyFn fnExp args) = do
 
 eval spr@(ESuper _) = (fmap responseToValue) $ extract $ evalT spr
 
-eval (Def n params exp) = eval $ Assign (LCVar n) (Lambda params exp)
+
 
 eval (DefSelf n ps exp) = do
   (mdl,fn) <- localModule
@@ -125,7 +161,6 @@ eval (DefSelf n ps exp) = do
   fn mdl'
   return val
 
-eval (Lambda params exp) = return (VFunction (mkFunct params exp) (mkArity params))
 
 eval (Block exps file) = do
   file' <- gets $ lookupLocals "__FILE__"
@@ -139,7 +174,7 @@ eval (If pred cons alt) = do
   if r == VNil || r == VFalse then maybe (return VNil) eval alt else eval cons
 
 eval (While cond exp) =
-  let 
+  let
     loop last = do
       cond' <- eval cond
       case cond' of
@@ -167,32 +202,10 @@ eval (Module n exp) = do
     VObject (Pid pid) -> sendM pid (Eval exp) >> return mdl
     _ -> buildModule n exp
 
-eval (ExString xs) = do
-    vals <- mapM eval xs
-    concatenate [] vals
-  where
-    concatenate :: [SapString] -> [Value] -> EvalM Value
-    concatenate ss [] = return $ VString $ mconcat (reverse ss)
-    concatenate ss (v:vs) = do { s<-vToStr v ; concatenate (s:ss) vs }
 
-    vToStr :: Value -> EvalM SapString
-    vToStr (VString s) = return s
-    vToStr val = do
-      v' <- eval (Call (EValue val) "to_s" [])
-      vToStr v'
-eval (EArray []) = return $ VArray $ A.empty
-eval (EArray xs) = do
-  x's <-  mapM eval xs
-  return $ VArray $ A.fromList x's
 
-eval (EHash xs) = do
-  let f (a,b) = do
-        a' <- eval a
-        b' <- eval b
-        return (a',b')
-  x's <- mapM f xs
-  hash <- buildHashFromList x's
-  return $ VHash hash
+
+
 
 eval exp = throwError $ Err "SystemError" ("Cannot yet evaluate the following expression:\n" ++ show exp) []
 
@@ -258,13 +271,13 @@ evalT (ESuper m_args) = do
   spr <- join $ gets superMethod
   case spr of
     Nothing -> throwError $ Err "NoMethodError" "super method not found" []
-    Just mws -> do 
+    Just mws -> do
       (fn, arity) <- mkFunctionFromValue (simple "super") $ mwsValue mws
       case m_args of
         Just args -> apply fn arity (runMWS mws) args
         Nothing -> do
           m_args' <- gets $ lookupLocals "__args"
-          case m_args' of 
+          case m_args' of
             Nothing -> apply fn arity (runMWS mws) []
             Just (VArray arr) -> apply fn arity (runMWS mws) (map EValue $ toList arr)
             Just (val) -> apply fn arity (runMWS mws) [EValue val]
@@ -338,7 +351,7 @@ buildClass n super exp = do
 --   returns both the local module and a function to return that module and
 --   a function to place that module backe into self.  Note: it is a bug to
 --   either a) modify the list of modules or b) change the meaning of self
---   between the call to localModuled and this function. 
+--   between the call to localModuled and this function.
 localModule :: EvalM (Object, (Object -> EvalM()))
 localModule = do
   slf <- gets self
@@ -377,44 +390,11 @@ registerClass n pid = do
   eval $ Call (EValue $ VObject $ scp) "setIVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme: why CVars?
 
 -- | The internal working so making a function
-mkFunct :: [Parameter]  -- formal parameters (TODO improve see issue #29)
-        -> Exp       -- the expression to be evaluated (typically a block)
-        -> [Value]   -- the actual parameters
-        -> EvalM ()  -- the resulting value is placed in the replier
-mkFunct params exp vals = do
-    c <- get
-    ps <- assignParams params vals
-    using (merge ps c) (evalT exp) -- Use evalT for proper tail calls
-  where
-    assignParams :: [Parameter] -> [Value] -> EvalM [(String,Value)]
-    assignParams [] [] = return [("__args",VArray $ A.fromList vals)]
-    assignParams [] _ = throwError $ Err "RunTimeError" "Function called with too many arguments" []
-    assignParams ((Param str):ps) [] = throwError $ Err "RunTimeError" "Function called with too few arguments" []
-    assignParams ((Default str exp):ps) [] = do
-      val <- eval exp
-      ps' <- assignParams ps []
-      return $ (str, val):ps'
-    assignParams [VarArg str] vs = return $ [(str,VArray(A.fromList vs))]
-    assignParams (p:ps) (v:vs) = assignParams ps vs >>= (\ps'-> return $ (getParamName p, v):ps')
+mkFunct :: Parameter  -- formal parameters 
+        -> [Exp]      -- the set of possible expression to be evaluated (typically blocks)
+        -> [Object]   -- the actual parameters
+        -> m (Object) -- the resulting value is placed in the replier
+mkFunct params expList vals = do  -- NOTE: Apply is responsible for corectly creating the enclosing scope
+    i <- match params vals
+    evalT (expList !! i) -- Use evalT for proper tail calls
 
--- | Part of the process of applying a function is to set the formal parameters
---   equal to the actual parameters.  Once accomplished, a new context is
---   created.  This function allows that new context to be safely used and then
---   discarded.
-using :: Context -> EvalM a -> EvalM a
-using c evalm = do
-  cOld <- get
-  put c
-  resp <- evalm
-  slf <- gets self
-  put cOld{self = (slf)}
-  return resp
-
-mkArity :: [Parameter] -> Arity
-mkArity params = loop (len,Just len) $ reverse params
-  where
-    len = length params
-    loop a [] = a
-    loop (min,_)   ((VarArg _):ps)    = loop (min-1,Nothing) ps
-    loop (min,max) ((Default _ _):ps) = loop (min-1,max) ps
-    loop a         ((Param _):_)      = a -- halt at the first non-optional param

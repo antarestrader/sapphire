@@ -1,7 +1,7 @@
 -- String.hs Copyright 2014-17 John F. Miller
 
 -- | String data and functions
-
+{-# LANGUAGE OverloadedStrings #-}
 module String
   ( SapString
   , mkStringLiteral
@@ -12,6 +12,7 @@ module String
 import qualified Data.Text.Lazy as T
 import Data.Monoid
 import Data.String
+import Control.Monad.Except
 
 data SapString =
    SapString
@@ -35,6 +36,13 @@ mkStringLiteral s = SapString { escapes = [], text = T.pack s }
 
 string :: SapString -> String
 string = T.unpack . text
+
+sconcat :: (IsString e, MonadError e m) =>
+    SapString -> SapString -> m SapString
+sconcat SapString{escapes=e1, text=x} SapString{escapes=e2, text=y}
+    | (e1 == e2) = return SapString{escapes = e1, text=mappend x y}
+    | otherwise  = throwError $  fromString
+          "String Error:Concatenating Strings with different escapes!"
 
 instance Monoid SapString where
   mempty = SapString{escapes = [], text = T.empty}
