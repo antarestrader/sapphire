@@ -14,10 +14,8 @@
 --  call where proper tail calls are in order evalT reimpliments them.
 
 module Eval (
-  , Err
-  , runEvalM
-  , eval
-  , evalT
+    eval
+--  , evalT
   )
 where
 
@@ -31,7 +29,7 @@ import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 import AST
 import Scope
-import Parameters as P
+import Eval.Parameters as P
 import Err
 import Object
 import String
@@ -45,6 +43,15 @@ import Utils
 
 evalArgs :: [Exp] -> [Object]
 evalArgs args = mapM eval args >>= (return . map o)
+
+-- | The internal working so making a function
+mkFunct :: Parameter  -- formal parameters 
+        -> [Exp]      -- the set of possible expression to be evaluated (typically blocks)
+        -> [Object]   -- the actual parameters
+        -> m (Object) -- the resulting value is placed in the replier
+mkFunct params expList vals = do  -- NOTE: Apply is responsible for corectly creating the enclosing scope
+    i <- match params vals
+    evalT (expList !! i) -- Use evalT for proper tail calls
 
 -- |Turns an expression into a Value, potentially performing
 --  side effects along the way.
@@ -117,14 +124,14 @@ eval (Lambda params exp) = do
     )
 
 eval (Def vis ord name params exps) = 
-  defMethod vis ord name (match params) (map evalT exps) -- TODO: This does not allow for optimization. We need the AST.
+  defMethod vis ord name params exps >> return $ v Nil
 
-eval (Apply var args vis) = undefined --TODO 
+eval (Apply var args vis) = undefined
  -- this can mean three things
  --  1) this is a local method call; call it
  --  2) this is a Lambda function; apply it 
  --  3) this is a non-function object;  call the method "call" on it
-
+{-
 eval (Call expr msg args) = do
   target <- eval expr
   xs <- evalArgs args
@@ -389,12 +396,5 @@ registerClass n pid = do
   scp <- gets CTX.scope
   eval $ Call (EValue $ VObject $ scp) "setIVar" [EAtom $ name n, EValue $ VObject $ Pid pid] --fixme: why CVars?
 
--- | The internal working so making a function
-mkFunct :: Parameter  -- formal parameters 
-        -> [Exp]      -- the set of possible expression to be evaluated (typically blocks)
-        -> [Object]   -- the actual parameters
-        -> m (Object) -- the resulting value is placed in the replier
-mkFunct params expList vals = do  -- NOTE: Apply is responsible for corectly creating the enclosing scope
-    i <- match params vals
-    evalT (expList !! i) -- Use evalT for proper tail calls
 
+-}

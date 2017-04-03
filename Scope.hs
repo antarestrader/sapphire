@@ -14,6 +14,8 @@ import  Control.Monad.Except
 import  Object
 import  Name
 import  Var
+import  AST
+import  Parameters
 
 data VariableContext = Local
                      | IVar
@@ -39,8 +41,9 @@ class (MonadError Object m) => Scope m where
   defMethod  :: Visibility -- ^ Public | Private | Protected
              -> Order -- ^ Append | Prepend | Replace
              -> Name  -- ^ Name of method
-             -> ([Object] -> m(Int)) -- ^ Function to parse Params (throw error when not matched)
-             -> [m (Value m)] -- The actions to execute
+             -> Parameter -- ^ the parameters to match
+             -> [Exp] -- ^ The actions to execute, one per parameter (presumably block)
+             -> m ()
   getMethod  :: Name -> [Object] -> Maybe (m (Value m))
   self       :: m (Value m)
   newScope   :: m a -> m a

@@ -3,7 +3,7 @@
 -- | Data structures for the Abstract Syntax Tree
 module AST where
 
-import Scope (Value, Scope)
+-- import Scope (Value, Scope)
 import Var
 import Name
 import Parameters
@@ -11,8 +11,7 @@ import Parameters
 -- | Primary Abstract Syntax Tree
 data Exp = Exp {node::Node, position::Position} -- deriving Show
 data Node =
-    EValue (forall m. Scope m => Value m) -- ^ allows values to be "shoved" back into expressions
-  | EVar Var -- ^ a possibly scoped variable
+    EVar Var -- ^ a possibly scoped variable
   | EInt Integer -- ^ Integer literal 
   | EFloat Double  -- ^ real number literal
   | EString String -- ^ string literal
@@ -56,6 +55,7 @@ data Node =
   | EClass Var (Maybe Var) Exp
   | Module Var Exp -- ^ Create or reopen a module
   | Block [Exp]-- ^ A block of sequential expressions.
+--  | EValue (forall m. Scope m => Value m) -- ^ allows values to be "shoved" back into expressions
     -- deriving Show
 
 -- | Left Hand Side data structure
