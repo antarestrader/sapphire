@@ -9,7 +9,7 @@ import Name
 import Parameters
 
 -- | Primary Abstract Syntax Tree
-data Exp = Exp {node::Node, position::Position} -- deriving Show
+data Exp = Exp {node::Node, position::Position}  deriving Show
 data Node =
     EVar Var -- ^ a possibly scoped variable
   | EInt Integer -- ^ Integer literal 
@@ -20,6 +20,7 @@ data Node =
   | EArray [Exp]   -- ^ an Array Literal
   | EHash  [(Exp,Exp)] -- ^ a Hash Literal
   | EIVar Name   -- ^ Named istance variable (\@foo)
+  | ECVar Name   -- ^ Named class variable (\@@foo)
   | ENil | EFalse | ETrue
     -- | Operator embeded Equation
     --
@@ -56,7 +57,7 @@ data Node =
   | Module Var Exp -- ^ Create or reopen a module
   | Block [Exp]-- ^ A block of sequential expressions.
 --  | EValue (forall m. Scope m => Value m) -- ^ allows values to be "shoved" back into expressions
-    -- deriving Show
+     deriving Show
 
 -- | Left Hand Side data structure
 --
@@ -69,5 +70,5 @@ data LHS =
   | LCVar Name
   | LIndex Exp [Exp]
   | LCall Exp Name [Exp]
-  | LSend Exp Name [Exp] -- deriving Show
+  | LSend Exp Name [Exp]  deriving Show
 

@@ -3,10 +3,12 @@
 -- | String data and functions
 {-# LANGUAGE OverloadedStrings #-}
 module String
-  ( SapString
+  ( module Data.String
+  , SapString
   , mkStringLiteral
   , string
   , stringLength
+  , sconcat
   ) where
 
 import qualified Data.Text.Lazy as T

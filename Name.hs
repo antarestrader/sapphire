@@ -15,9 +15,9 @@ data Position = Position
   { filename :: FilePath
   , lineNo :: Integer
   , offset :: Integer
-  } deriving Show
+  } deriving (Show,Eq)
 
 data AssocLR = L | R | N deriving (Show,Eq,Ord)
 data Visibility = Public | Private | Protected deriving (Show, Eq)
-data Order = Append | Prepend | Overwrite
+data Order = Append | Prepend | Overwrite deriving (Show,Ord,Eq)
 

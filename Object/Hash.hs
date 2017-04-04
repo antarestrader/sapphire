@@ -24,6 +24,9 @@ instance Show Hash where
     where
       inner = intercalate ", " $ map show (H.elems hm)
 
+instance Eq Hash where
+ a == b = hUID a == hUID b
+
 data HKey = HKInt Integer
           | HKFloat Double
           | HKString String

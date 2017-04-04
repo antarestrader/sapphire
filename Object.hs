@@ -1,5 +1,6 @@
 -- Object.hs Copyright 2013-2017 John F. Miller
-{-# LANGUAGE OverloadedStrings,  NamedFieldPuns, MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings,  NamedFieldPuns, 
+    MultiParamTypeClasses, RankNTypes, LiberalTypeSynonyms  #-}
 module Object where
 
 import Data.Map.Strict (Map)
@@ -9,8 +10,11 @@ import Data.Foldable (toList)
 
 import String
 import Name
+import {-# SOURCE #-} Scope
 import Object.Array
 import Object.Hash (Hash(..))
+import AST (Exp)
+import Parameters
 
 
 import qualified Runtime as R
@@ -18,7 +22,9 @@ import Err
 
 type Runtime = R.Runtime State Object
 type PID = R.PID Object
-type Fn = [Object] -> Runtime Object
+-- mustr be a datatype to avoide impredictive types
+data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
+        | AST {params :: Parameter, asts :: [Exp]}
 
 
 data Object = Prim !Primitive
@@ -36,6 +42,18 @@ data Primitive = VInt    !Integer
                | VArray !Array
                | VHash !Hash
                | VAtom !String
+                 deriving Eq
+
+instance Eq Object where
+  (Prim a)     == (Prim b)     = a == b
+  (Process a)  == (Process b)  = a == b
+  (VError a)   == (VError b)   = a == b
+  (TrueClass)  == (TrueClass)  = True
+  (FalseClass) == (FalseClass) = True
+  (Nil)        == (Nil)        = True
+  (Object a)   == (Object b)   = uid a == uid b
+  (VFunction {fUID = a}) == (VFunction {fUID = b}) = a == b
+  _ == _ = False
 
 instance IsString Primitive where
   fromString str = VString $ fromString str

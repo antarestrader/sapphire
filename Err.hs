@@ -10,6 +10,8 @@ module Err (
 
 import Data.String
 
+import Name
+
 class Error e where
   strMsg :: String -> e
   noMsg :: e
@@ -19,7 +21,9 @@ instance Error String where
   strMsg = id
 
 data Err a = Err String String [a]
+           | ErrPos String String Position [a]
            | ErrObj a
+             deriving Eq
 
 instance Error (Err a) where
   strMsg s = Err "StandardError" s []

@@ -5,7 +5,7 @@ where
 
 import Data.List
 
-import Object hiding (arity)
+import {-# SOURCE #-} Object hiding (arity)
 import Name
 
 data Parameter = 

@@ -7,7 +7,7 @@ import Name
 --type Precedence = (Int, AssocLR, AssocLR)
 type Runtime = R.Runtime State Object
 type PID = R.PID Object
-type Fn = [Object] -> Runtime Object
+data Fn
 
 data Object
 data State

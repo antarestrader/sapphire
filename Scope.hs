@@ -46,7 +46,9 @@ class (MonadError Object m) => Scope m where
              -> m ()
   getMethod  :: Name -> [Object] -> Maybe (m (Value m))
   self       :: m (Value m)
-  newScope   :: m a -> m a
+  future     :: m (PID)
+  super      :: maybe [Object] -> m ()
+  newScope   :: m () -> m (Value m)
   call       :: Maybe (Value m) -> Name -> [Object] -> m (Value m)
   send       :: PID -> Name -> [Object] -> (Object -> m ()) -> m ()
   tailCall   :: Maybe (Value m) -> Name -> [Object] -> m ()

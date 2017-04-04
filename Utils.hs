@@ -45,6 +45,7 @@ shunt _ xs ys ops = error $ "Shunting Yard Algorithm bug:\n" ++ show xs ++ ('\n'
 findOp c op = maybe (5,L,L) id (M.lookup op c)
 
 makeOpExpr :: Precedence -> Exp -> Exp -> Op -> Exp
-makeOpExpr (_,_,L) l r op = (Call l op [r])
-makeOpExpr (_,_,R) l r op = (Call r op [l])
-makeOpExpr (_,_,N) l r op = (Apply (Var {name=op, scope=[]}) [l,r] Public)
+makeOpExpr (_,_,L) l r op = Exp (Call l op [r]) (position l)
+makeOpExpr (_,_,R) l r op = Exp (Call r op [l]) (position l)
+makeOpExpr (_,_,N) l r op = Exp (Apply (Var {name=op, varscope=[]}) [l,r] Public) (position l)
+
