@@ -69,6 +69,26 @@ promoteErrot e = throwError e
 -- |Turns an expression into a Value, potentially performing
 --  side effects along the way.
 eval :: Scope m => Exp -> m (Value m)
+eval Exp{node=(OpAssign lhs op exp), position} =
+    case lhs of
+      LVar var  -> eval $ rewrite (EVar var)
+      LIVar var -> eval $ rewrite (EIVar var)
+      LCVar var -> eval $ rewrite (ECVar var)
+      LIndex exp args -> eval $ rewrite (Index exp args)
+      LCall exp name args -> eval $ rewrite (Call exp name args)
+      LSend exp name args -> eval $ rewrite (Send exp name args)
+  where
+    rewrite :: Node -> Exp
+    rewrite n =Exp {node =
+         ( Assign
+             lhs
+             ( Exp {node=
+                   ( OpStr
+                      (Exp {node = n, position})
+                      [(op,exp)]
+                   ), position}
+             )
+         ), position}
 eval Exp{node,position} =
   eval' node `catchError` promoteError position
 
@@ -187,29 +207,53 @@ eval' (Assign lhs exp) = eval exp >>=(\val -> assign lhs (o val) >> return val)
   where
     assign :: Scope m => LHS -> Object -> m ()
     assign (LVar ( Var {name, varscope = []})) obj = setVar Local name obj
+      -- What happens when this is a method name?
     assign (LIVar name) obj = setVar IVar name obj
     assign (LCVar name) obj = setVar CVar name obj
     assign (LIndex target idxs) obj = do
-      args <- (evalArgs idxs) 
-      tar <- eval target  
+      args <- (evalArgs idxs)
+      tar <- eval target
       call (Just tar) "[]=" (args ++ [obj])
       return ()
-{-
-eval' (OpAssign lhs@(LVar var) op exp) =
-  eval' (Assign lhs (OpStr (EVar var) [(op,exp)]))
-eval' (OpAssign lhs@(LIVar var) op exp) =
-  eval' (Assign lhs (OpStr (EIVar var) [(op,exp)]))
-eval' (OpAssign lhs@(LCVar var) op exp) =
-  eval' (Assign lhs (OpStr (ECVar var) [(op,exp)]))
--}
-
+    assign (LCall target name args) obj = do
+      args <- evalArgs args
+      tar <- eval target
+      call (Just tar) (name++"=") (args ++ [obj])
+      return ()
+    assign (LSend target name args) obj = do
+      args <- evalArgs args
+      tar <- eval target
+      case tar of
+        Pointer pid -> send pid (name++"=") (args++[obj]) (\_->return ())
+        val ->  call (Just val) (name++"=") (args ++ [obj]) >> return ()
+-- OpAssign node covered by a rewrite rule above.
 eval' (If pred cons alt) = do
   r <- eval pred
   let r' = o r in
     if r' == Nil || r' == FalseClass -- What about processes?
-      then maybe (return $ v Nil) eval alt 
+      then maybe (return $ v Nil) eval alt
       else eval cons
 
+eval' (While cond exp) = loop $ v $ Nil
+  where
+    loop last = do
+      cond' <- eval cond
+      case o cond' of
+        (Nil) -> return last
+        (FalseClass) -> return last
+        _ -> loop =<< eval exp
+
+eval' (Until cond exp) = loop $ v $ Nil
+  where
+    loop last = do
+      cond' <- eval cond
+      case o cond' of
+        (Nil) -> loop =<< eval exp
+        (FalseClass) -> loop =<< eval exp
+        _ -> return last
+-- todo EClass
+-- todo Module
+eval' (Block exps) = fmap last $ mapM eval exps
 eval' exp =
   throwError $ VError $
     Err  "SystemError"
