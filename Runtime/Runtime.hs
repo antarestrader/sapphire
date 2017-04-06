@@ -23,7 +23,7 @@ type Fn st a = Name -> [a] -> Runtime st a a
 
 
 newtype Runtime st obj a = Runtime {unRuntime :: RunTimeM st obj a}
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadError obj)
 
 class Obj a where
   toObj :: PID a -> a

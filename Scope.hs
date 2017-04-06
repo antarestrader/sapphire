@@ -44,7 +44,7 @@ class (MonadError Object m) => Scope m where
              -> Parameter -- ^ the parameters to match
              -> [Exp] -- ^ The actions to execute, one per parameter (presumably block)
              -> m ()
-  getMethod  :: Name -> [Object] -> Maybe (m (Value m))
+  getMethod  :: Name -> [Object] -> m (Maybe Fn)
   self       :: m (Value m)
   future     :: m (PID)
   super      :: maybe [Object] -> m ()
