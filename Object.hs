@@ -13,6 +13,7 @@ import Name
 import {-# SOURCE #-} Scope
 import Object.Array
 import Object.Hash (Hash(..))
+import Object.UID
 import AST (Exp)
 import Parameters
 
@@ -20,7 +21,7 @@ import Parameters
 import qualified Runtime as R
 import Err
 
-type Runtime = R.Runtime State Object
+type Runtime = R.Runtime SystemState Object
 type PID = R.PID Object
 -- mustr be a datatype to avoide impredictive types
 data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
@@ -99,7 +100,7 @@ data State =
       }
 
 instance R.StateClass State Object where
-  -- markState :: State -> [PID]
+  -- markState :: State -> IO [PID]
   markState 
     Instance {
         ivars
@@ -149,6 +150,17 @@ mark map = foldMap f map
     f :: Object -> [PID]
     f (Process pid) = [pid]
     f _ = []
+
+data SystemState = SystemState
+  { objectState :: State
+  , uidSource   :: UIDSource
+  , localScope  :: [Namespace Object] --Note: Process is responsible for tracking this
+  }
+
+instance R.StateClass SystemState Object where
+  markState ss = do
+    xs <- R.markState (objectState ss)
+    return $ xs ++ concatMap mark (localScope ss)
 
 vnil :: Object
 vnil = Nil

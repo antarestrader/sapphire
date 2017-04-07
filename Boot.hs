@@ -1,4 +1,4 @@
--- Boot.hs Copyright 2013, 2014 John F. Miller
+-- Boot.hs Copyright 2013-2017 John F. Miller
 
 -- | This module which exports a single function, @boot@, is responsible for
 --   setting up the runtime system.  Note: if you are looking for the place

@@ -16,6 +16,7 @@
 module Eval (
     eval
   , evalT
+  , mkFunct
   )
 where
 

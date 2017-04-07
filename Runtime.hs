@@ -132,7 +132,10 @@ data SRT obj = Completed obj | Errored obj | Messaged (Message obj)
 
 shadowRuntime :: forall obj st. StateClass st obj => 
                  PID obj 
-              -> RunTimeM st obj ((PID obj),(Hole obj -> IO (Either obj obj, RunTimeState st obj)))
+              -> RunTimeM st obj (
+                     (PID obj),
+                     (Hole obj -> IO (Either obj obj, RunTimeState st obj))
+                   )
 shadowRuntime downstream = do
     pid <- liftIO $ newPID
     rts <- get

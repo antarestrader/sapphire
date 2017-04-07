@@ -41,7 +41,9 @@ data RunTimeState st obj = RTS {
   , fn       :: Fn st obj -- this is where eval goes
   }
 
-run ::  RunTimeState st obj -> RunTimeM st obj a -> IO (Either obj (a, RunTimeState st obj))
+run :: RunTimeState st obj 
+    -> RunTimeM st obj a 
+    -> IO (Either obj (a, RunTimeState st obj))
 run s a = runExceptT $ runStateT a s
 
 markRTS :: StateClass st obj => RunTimeState st obj -> IO [PID obj]

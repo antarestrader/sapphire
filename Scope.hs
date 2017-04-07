@@ -1,5 +1,5 @@
 -- Scope.hs Copyright 2017 John F. Miller
-{-# LANGUAGE OverloadedStrings,  NamedFieldPuns, 
+{-# LANGUAGE OverloadedStrings,  NamedFieldPuns,
     MultiParamTypeClasses, FlexibleContexts  #-}
 module Scope (
     VariableContext(..)

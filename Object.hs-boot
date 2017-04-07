@@ -4,16 +4,17 @@ import Data.String
 import qualified Runtime as R
 import Name
 
---type Precedence = (Int, AssocLR, AssocLR)
-type Runtime = R.Runtime State Object
+type Runtime = R.Runtime SystemState Object
 type PID = R.PID Object
 data Fn
 
 data Object
-data State
 data Primitive
---data AssocLR
+data State
+data SystemState
+
 
 vnil :: Object
 instance Show Object
+instance Eq Object
 instance IsString Object

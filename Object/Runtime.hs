@@ -17,7 +17,7 @@ import Name
 
 instance Scope Runtime where
   readVar IVar name = do
-    map <- ivars <$> getState
+    map <- ivars . objectState <$> getState
     return 
       $   (\obj -> MV {obj,replace=(setVar IVar name)})
       <$> lookup name map
