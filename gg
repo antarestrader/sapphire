@@ -1,0 +1,8 @@
+#! /bin/sh
+
+if [ "$#" -eq "0" ]
+ then
+   ghc -outputdir tmp Main.hs
+else
+   ghc -outputdir tmp $*
+fi

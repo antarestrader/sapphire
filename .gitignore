@@ -12,3 +12,4 @@ tmp/
 *.swp
 *~
 doc/*.html
+*.tmp
