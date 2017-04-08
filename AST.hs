@@ -7,6 +7,7 @@ module AST where
 import Var
 import Name
 import Parameters
+import LineParser
 
 -- | Primary Abstract Syntax Tree
 data Exp = Exp {node::Node, position::Position}  deriving Show

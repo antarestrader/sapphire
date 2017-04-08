@@ -80,6 +80,7 @@ buffer = do
 clearBuffer :: Lexer ()
 clearBuffer = modify (\s -> s{_buffer=id})
 
+appendBuffer :: String -> Lexer ()
 appendBuffer str = modify (\s@L{_buffer=b} -> s{_buffer = b . (str ++)})
 
 -- | The core Token types.

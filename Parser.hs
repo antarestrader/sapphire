@@ -77,16 +77,19 @@ module Parser (
   , TParser, tokenP, tokenEq, keyword, position, many1Ignore, foldP, andor, prepend
 )where
 
-import Tokens
-import LineParser (parseCode, filename, CodeBlock)
-import AST
-import Var
 import Control.Monad
 import Control.Monad.Error.Class
 import Data.Maybe
 import Text.Parsec hiding (token, string)
 import qualified Text.Parsec as P
 import Text.Parsec.Pos
+
+import Tokens
+import LineParser (parseCode, filename, CodeBlock)
+import AST
+import Parameters
+import Name
+import Var
 
 -- | Type synonym for the type of our parser
 --

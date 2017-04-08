@@ -1,10 +1,11 @@
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables  #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables,  
+    MultiParamTypeClasses, RankNTypes, FlexibleInstances#-}
 
 module Runtime (
       module Runtime.PID
     , Runtime
     , Obj(..), StateClass(..)
-    , getState, putState, try, throw, call, debug, runGC
+    , getState, putState, call, debug, runGC
     , spawn, self, bootstrap, mkHole, readHole, writeHole
   ) where
 
@@ -27,21 +28,20 @@ import Runtime.GarbageCollector
 getState    = Runtime $ gets state
 putState st = Runtime $ modify (\rst -> rst{state = st})
 
-try :: Runtime st obj obj -> (obj -> Runtime st obj obj) -> Runtime st obj obj
-try f handler = Runtime $ do
-  rts <- get
-  let old_err = error rts 
-      handler' err = do
-        modify (\rts-> rts{error= old_err})
-        unRuntime $ handler err
-  err <- liftIO $ atomically $ mkHole
-  put rts{error = err}
-  res <- catchError (unRuntime f) handler'
-  modify (\rts-> rts{error= old_err})
-  return res
+instance (MonadError obj) (Runtime st obj) where
+  catchError f handler = Runtime $ do
+    rts <- get
+    let old_err = error rts 
+        handler' err = do
+          modify (\rts-> rts{error= old_err})
+          unRuntime $ handler err
+    err <- liftIO $ atomically $ mkHole
+    put rts{error = err}
+    res <- catchError (unRuntime f) handler'
+    modify (\rts-> rts{error= old_err})
+    return res
 
-throw :: obj -> Runtime st obj a
-throw = Runtime . throwError
+  throwError = Runtime . throwError
 
 call :: (Obj obj, StateClass st obj) =>PID obj -> Name -> [obj] -> Runtime st obj obj
 call pid n ps = Runtime $ do

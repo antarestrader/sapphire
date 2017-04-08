@@ -29,6 +29,7 @@ import Control.Monad.Except
 import Control.Exception(try, BlockedIndefinitelyOnSTM)
 
 import AST
+-- import Parser --TODO: Big Yacks here; fix later
 import Name
 import Scope
 import Eval.Parameters as P

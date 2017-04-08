@@ -27,7 +27,6 @@ type PID = R.PID Object
 data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
         | AST {params :: Parameter, asts :: [Exp]}
 
-
 data Object = Prim !Primitive
             | Process !PID
             | TrueClass
