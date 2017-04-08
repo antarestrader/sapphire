@@ -54,8 +54,8 @@ data Node =
     -- | Build a new class or reopen and existing one at Var with (Maybe Var)
     --   as super class.  the Exp will be run in the in the context of the
     --   class.
-  | EClass Var (Maybe Var) Exp
-  | Module Var Exp -- ^ Create or reopen a module
+  | EClass Var (Maybe Var) CodeBlock -- ^ Create or reopen a class
+  | Module Var CodeBlock -- ^ Create or reopen a module
   | Block [Exp]-- ^ A block of sequential expressions.
 --  | EValue (forall m. Scope m => Value m) -- ^ allows values to be "shoved" back into expressions
      deriving Show

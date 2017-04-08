@@ -60,11 +60,14 @@ call pid n ps = Runtime $ do
       Right obj -> put rts >> return obj
       Left  err -> throwError err
 
-spawn :: (Obj obj, StateClass st obj) => st -> Fn st obj -> Runtime st obj obj
+spawn :: (Obj obj, StateClass st obj) 
+      => st 
+      -> Fn st obj 
+      -> Runtime st obj (PID obj)
 spawn st f = Runtime $ do
   gc <- gets gc
   pid <- liftIO $ spawnPID gc st f
-  return $ toObj pid
+  return pid
 
 self :: Obj obj => Runtime st obj obj
 self = Runtime $ gets (toObj . ourself)
