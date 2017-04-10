@@ -6,15 +6,51 @@
 
 module Boot (boot) where
 
+import Control.Concurrent.STM
+import System.Exit
+import Data.Map.Strict (empty)
+
 import Object
 import Boot.Options
-
-
-baseLibrary = "lib/base.sap"
+import Object.UID
+import Runtime (bootstrap, call)
+import Runtime.PID
+import Runtime.Hole
+import Object.Runtime
+import Scope
+import Name
 
 -- | This function builds up the initial runtime. The run time includes
 --   Object and Class classes with the internal functions installed. The
 --   object returned is an instance of Object sutable to running code.
-boot :: Options -> Runtime () -> IO ()
-boot = undefined
+boot :: Options  -- ^ command line options
+     -> Runtime () -- ^ The program to run after boot
+     -> IO () -- ^ The action which is running the program
+boot opts prgm = do
+  uids <- newUIDSource
+  pid <- bootstrap (initialState opts uids) (initialProcess prgm)
+  (r,e) <- atomically $ do
+    res <- mkHole
+    err <- mkHole
+    writePID pid $ Call "initialize" [] empty res err
+    return (res, err)
+  final <- atomically $  (Right <$> readHole r) `orElse`  (Left <$> readHole e)
+  case final of
+    Right _ -> exitSuccess
+    Left err -> die (show err)
 
+
+initialProcess :: Runtime ()
+               -> Name -> [Object] -> Runtime Object
+initialProcess prgm _ _ = do
+  undefined
+  val <- newScope prgm
+  return $ o val
+
+initialState :: Options -> UIDSource -> SystemState
+initialState opts uids=  SystemState {
+    objectState = ROOT
+  , uidSource = uids
+  , localScope = []
+  , cmdLineOptions = opts
+  }

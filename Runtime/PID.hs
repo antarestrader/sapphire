@@ -3,7 +3,6 @@
 module Runtime.PID 
   ( PID
   , Message(..)
-  , Name
   , writePID
   , readPID
   , tID, newPID, forkPID) where
@@ -12,11 +11,11 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Map.Strict (Map)
 
+import Name
 import Runtime.Hole
 
 data PID obj = PID {q :: TQueue (Message obj), tID :: ThreadId} deriving Eq
 type ShadowMap obj = Map ThreadId (PID obj)
-type Name = String
 
 
 data Message obj = 

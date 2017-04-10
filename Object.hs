@@ -14,6 +14,7 @@ import {-# SOURCE #-} Scope
 import Object.Array
 import Object.Hash (Hash(..))
 import Object.UID
+import Boot.Options
 import AST (Exp)
 import Parameters
 
@@ -154,6 +155,7 @@ data SystemState = SystemState
   { objectState :: State
   , uidSource   :: UIDSource
   , localScope  :: [Namespace Object] --Note: Process is responsible for tracking this
+  , cmdLineOptions :: Options
   }
 
 instance R.StateClass SystemState Object where

@@ -6,13 +6,15 @@
 module Object.Runtime where
 
 import Prelude hiding (lookup)
-import Control.Monad.Except
-import Data.Map.Strict
+import Control.Monad.State (modify)
+import Control.Monad.Except hiding (ap)
+import Data.Map.Strict as M
 import Data.String
 
 import Object
 import Scope
 import qualified Runtime as R hiding (Runtime)
+import qualified Runtime.Runtime as RR
 import Name
 import Eval
 
@@ -44,23 +46,32 @@ instance Scope Runtime where
 
   spawn (Process pid) = return $ Process pid
   spawn (Object st) = do
-    uids <- uidSource <$> R.getState
+    ss <- R.getState
     pid <- R.spawn
-        SystemState{
+        ss {
             objectState = st
-          , uidSource = uids
           , localScope = []
-        }
+          }
         (processForState st)
     send pid "initialize" [] (\_->return ())
     return $ Process pid
   spawn prim = undefined
 
+  newScope act = do
+    ss <- R.getState
+    R.putState ss{localScope = (M.empty : (localScope ss))}
+    obj <- R.apply Nil act
+    ss' <- R.getState
+    R.putState ss'{localScope = tail (localScope ss)}
+    return $ v obj
+
+
 evalProcess :: Runtime() -> Process -> Process
-evalProcess init f "initialize" args = init >> f "initialize" args
-evalProcess _ f name args = f name args
--- The problem here is that we can never forget init
--- I still would like to be able to mutate an object's Process
+evalProcess init f name args = reset >> init >> f name args
+  where
+    reset :: Runtime ()
+    reset = RR.Runtime $ modify (\rts -> rts{RR.fn=f})
+
 
 instanceProcess :: Name -> [Object] -> Runtime Object
 instanceProcess name args= do
@@ -79,9 +90,17 @@ instanceProcess name args= do
 -- ------------------------------------------
 
 applyFn :: [Object] -> Fn -> Runtime Object
-applyFn args (Fn{fn}) = o <$> (newScope $ fn args)
-applyFn args (AST{params, asts}) =
-      o <$> (newScope $ mkFunct params asts args)
+applyFn args (Fn{fn}) = ap $ fn args
+applyFn args (AST{params, asts}) = ap $ mkFunct params asts args
 
 processForState :: State -> Process
 processForState Instance{} = instanceProcess
+
+ap :: Runtime () -> Runtime Object
+ap fn = do
+ ss <- R.getState
+ R.putState ss{localScope = (M.empty : (localScope ss))}
+ fn
+ ss' <- R.getState
+ R.putState ss'{localScope = tail (localScope ss)}
+ R.readResponse Nil

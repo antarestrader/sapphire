@@ -8,10 +8,14 @@ ver = "Sapphire Interperter (Early Developmet Version).  "
 data Options = Options 
   { debug :: Bool
   , version :: String
+  , stdLib :: FilePath
+  , baseLibrary :: FilePath
   }
 
 defaultOptions :: Options
 defaultOptions = Options
   { debug  = False
   , version = ver
+  , stdLib = "lib/"
+  , baseLibrary = "base.sap"
   }

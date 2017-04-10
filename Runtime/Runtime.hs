@@ -16,6 +16,7 @@ import qualified Data.Map.Strict as M
 import Runtime.Hole
 import Runtime.GarbageCollector
 import Runtime.PID
+import Name
 
 type RunTimeM s obj = StateT (RunTimeState s obj) (ExceptT obj IO)
 type ShadowMap obj = Map ThreadId (PID obj)
