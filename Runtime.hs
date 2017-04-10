@@ -98,16 +98,16 @@ spawnPID gc st f = do
   return pid
 
 runtime :: forall st obj. StateClass st obj=>  GC obj -> PID obj -> st -> Fn st obj -> IO ()
-runtime gc pid st f = loop st
+runtime gc pid st f = loop st f
   where 
-    loop :: StateClass st obj=> st -> IO ()
-    loop st = do
-      r <- go st 
+    loop :: StateClass st obj=> st -> Fn st obj -> IO ()
+    loop st  f = do
+      r <- go st f
       case r of
         Nothing -> return ()
-        Just st' -> loop st'
-    go ::  StateClass st obj => st -> IO (Maybe st)
-    go st = do
+        Just (st',f') -> loop st' f'
+    go ::  StateClass st obj => st -> Fn st obj -> IO (Maybe (st, Fn st obj) )
+    go st funct = do
       m <- atomically $ readPID pid
       case m of
         Quit -> return Nothing
@@ -119,17 +119,17 @@ runtime gc pid st f = loop st
             , gc = gc
             , ourself = pid
             , shadows = sm
-            , fn = f
+            , fn = funct
             }
-          result <- run rts (unRuntime $ f n ps)
+          result <- run rts (unRuntime $ funct n ps)
           case result of
             Right (obj, rts') -> do
               atomically $ writeHole (response rts') obj 
-              return (Just $ state rts')
+              return (Just (state rts', fn rts'))
             Left e -> do
               atomically $ writeHole (error rts) e
-              return (Just $ state rts)
-        Mark f -> liftIO (markState st >>= f) >> (return $ Just st)
+              return (Just (state rts, fn rts)) -- should this be (st, funct) instead?
+        Mark f -> liftIO (markState st >>= f) >> (return $ Just (st, funct))
 
 data SRT obj = Completed obj | Errored obj | Messaged (Message obj) 
 
