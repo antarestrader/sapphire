@@ -6,7 +6,7 @@
 module Object.Runtime where
 
 import Prelude hiding (lookup)
-import Control.Monad.State (modify)
+import Control.Monad.State hiding (State, state, ap)
 import Control.Monad.Except hiding (ap)
 import Data.Map.Strict as M
 import Data.String
@@ -19,6 +19,10 @@ import Name
 import Eval
 
 type Process = Name -> [Object] -> Runtime Object
+
+instance (MonadState State) Runtime where
+  get = objectState <$> R.getState
+  put st = R.getState >>= (\ss -> R.putState ss{objectState = st})
 
 instance Scope Runtime where
   readVar IVar name = do
@@ -44,7 +48,7 @@ instance Scope Runtime where
             R.putState ss{localScope=scp'}
     return $ loop scp 0
 
-  spawn (Process pid) = return $ Process pid
+  spawn (Process pid) = return pid
   spawn (Object st) = do
     ss <- R.getState
     pid <- R.spawn
@@ -54,7 +58,7 @@ instance Scope Runtime where
           }
         (processForState st)
     send pid "initialize" [] (\_->return ())
-    return $ Process pid
+    return  pid
   spawn prim = undefined
 
   newScope act = do
@@ -85,6 +89,8 @@ instanceProcess name args= do
           Just f -> applyFn args' f
           Nothing ->
             throwError $ fromString $ "MethodMissing: "++name++" not found"
+
+classProcess = instanceProcess
 
 -- =============PRIVATE======================
 -- ------------------------------------------

@@ -95,7 +95,7 @@ eval Exp{node,position} =
   eval' node `catchError` promoteError position
 
 eval' :: Scope m => Node -> m (Value m)
-eval' (EVar Self) = self
+eval' (EVar Self) = Pointer <$> self
 eval' (EVar Var {name, varscope = []}) =  maybe (v Nil) id <$> readVar Local name
 eval' (EVar var) = maybe (v Nil) id <$> findVar var
 eval' (EInt i) = return $ v (Prim $ VInt i)

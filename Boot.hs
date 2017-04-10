@@ -7,14 +7,16 @@
 module Boot (boot) where
 
 import Control.Concurrent.STM
+import Control.Monad.State hiding (State, state, ap)
 import System.Exit
 import Data.Map.Strict (empty)
 
 import Object
 import Boot.Options
 import Object.UID
-import Runtime (bootstrap, call)
-import Runtime.PID
+import Runtime (bootstrap, call, readResponse)
+import Runtime.PID hiding (PID)
+import qualified Runtime.Runtime as RR
 import Runtime.Hole
 import Object.Runtime
 import Scope
@@ -43,9 +45,13 @@ boot opts prgm = do
 initialProcess :: Runtime ()
                -> Name -> [Object] -> Runtime Object
 initialProcess prgm _ _ = do
-  undefined
-  val <- newScope prgm
-  return $ o val
+    objPid <- self
+    clsPid <- spawn $ classObject objPid
+    put $ stateForObject objPid clsPid
+    RR.Runtime $ modify (\rts -> rts{RR.fn=classProcess})
+    main <- initialize prgm
+    tailCall (Just main) "run" []
+    readResponse $ Process objPid 
 
 initialState :: Options -> UIDSource -> SystemState
 initialState opts uids=  SystemState {
@@ -54,3 +60,12 @@ initialState opts uids=  SystemState {
   , localScope = []
   , cmdLineOptions = opts
   }
+
+
+-- temporary
+initialize :: Runtime() -> Runtime (Value Runtime)
+initialize = undefined
+classObject  :: PID -> Object
+classObject = undefined
+stateForObject :: PID -> PID -> State 
+stateForObject = undefined

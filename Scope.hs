@@ -45,13 +45,13 @@ class (MonadError Object m) => Scope m where
              -> [Exp] -- ^ The actions to execute, one per parameter (presumably block)
              -> m ()
   getMethod  :: Name -> [Object] -> m (Maybe Fn)
-  self       :: m (Value m)
-  future     :: m (PID)
+  self       :: m PID
+  future     :: m PID
   super      :: maybe [Object] -> m ()
   newScope   :: m () -> m (Value m)
   call       :: Maybe (Value m) -> Name -> [Object] -> m (Value m)
   send       :: PID -> Name -> [Object] -> (Object -> m ()) -> m ()
   tailCall   :: Maybe (Value m) -> Name -> [Object] -> m ()
-  spawn      :: Object -> m Object
+  spawn      :: Object -> m PID 
   presidenceTable :: m (PrecedenceTable)
   nextUID    :: m UID
