@@ -13,12 +13,16 @@ import Data.Map.Strict (empty)
 
 import Object
 import Boot.Options
-import Object.UID
+import Object.UID hiding (nextUID)
 import Runtime (bootstrap, call, readResponse)
+import qualified Runtime as R
 import Runtime.PID hiding (PID)
 import qualified Runtime.Runtime as RR
 import Runtime.Hole
 import Object.Runtime
+import Builtin.Bindings
+import Builtin.Object
+import Builtin.Class
 import Scope
 import Name
 
@@ -46,12 +50,18 @@ initialProcess :: Runtime ()
                -> Name -> [Object] -> Runtime Object
 initialProcess prgm _ _ = do
     objPid <- self
-    clsPid <- spawn $ classObject objPid
-    put $ stateForObject objPid clsPid
+    uid <- nextUID
+    ss <- R.getState
+    clsPid <- R.spawn
+      ss{  localScope = []
+         , objectState = (classObject objPid)
+         }
+      (evalProcess classInit classProcess)
+    put $ stateForObject objPid clsPid uid
     RR.Runtime $ modify (\rts -> rts{RR.fn=classProcess})
     main <- initialize prgm
     tailCall (Just main) "run" []
-    readResponse $ Process objPid 
+    readResponse $ Process objPid
 
 initialState :: Options -> UIDSource -> SystemState
 initialState opts uids=  SystemState {
@@ -60,12 +70,3 @@ initialState opts uids=  SystemState {
   , localScope = []
   , cmdLineOptions = opts
   }
-
-
--- temporary
-initialize :: Runtime() -> Runtime (Value Runtime)
-initialize = undefined
-classObject  :: PID -> Object
-classObject = undefined
-stateForObject :: PID -> PID -> State 
-stateForObject = undefined

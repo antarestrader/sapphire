@@ -11,6 +11,7 @@ where
 
 import  Data.Map.Strict (Map)
 import  Control.Monad.Except
+import  Control.Monad.State hiding (State)
 import  Object
 import  Name
 import  Var
@@ -34,7 +35,7 @@ o :: Value m -> Object
 o (Pointer pid) = Process pid
 o val = obj val
 
-class (MonadError Object m) => Scope m where
+class (MonadError Object m, MonadState State m) => Scope m where
   readVar    :: VariableContext -> Name -> m (Maybe (Value m))
   findVar    :: Var -> m (Maybe (Value m))
   setVar     :: VariableContext -> Name -> Object -> m ()
@@ -52,6 +53,7 @@ class (MonadError Object m) => Scope m where
   call       :: Maybe (Value m) -> Name -> [Object] -> m (Value m)
   send       :: PID -> Name -> [Object] -> (Object -> m ()) -> m ()
   tailCall   :: Maybe (Value m) -> Name -> [Object] -> m ()
+  reply      :: Object -> m()
   spawn      :: Object -> m PID 
   presidenceTable :: m (PrecedenceTable)
   nextUID    :: m UID

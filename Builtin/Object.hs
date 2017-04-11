@@ -1,41 +1,31 @@
-module Builtin.Object where
+module Builtin.Object (stateForObject) where
 
-import Builtin.Utils hiding (call)
-import Builtin.Bindings (initialize)
+import Data.Map.Strict (empty, fromList)
+import  Control.Monad.Except
+
 import Object
-import qualified Array as A
-import AST
+import Name
 import Err
-import Eval
-import Parser (parseFile)
-import Object.Graph
-import Object.Spawn
-import Context
-import String
-import Var
-import Parser(parseString)
+import Scope hiding (Class)
 
-import qualified Data.Map as M
-import Control.Monad.State
-import Control.Monad.IO.Class
-import Control.Monad.Except
-import Control.Concurrent.STM.TMVar
-import System.IO.Unsafe
+stateForObject :: PID -> PID -> UID-> State
+stateForObject objpid clspid uid = Class {
+    ivars = empty
+  , instanceOfClass = clspid
+  , globalNamespace = objpid
+  , localNamespace = objpid
+  , localCache = empty
+  , superClass = undefined
+  , methods = bootstrapset
+  , methodCache = empty
+  , modules = []
+  , uid = uid
+  }
 
-objectClass :: IO Object
-objectClass = spawnObject $ Class{
-        ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
-        klass = ROOT,
-        modules = [],
-	process = unsafePerformIO newEmptyTMVarIO,
-        super = ROOT,
-        cvars = bootstrapset,
-        cmodules = [],
-        properName = "Object"}
-
-bootstrapset = M.fromList [
-         ("call",   VFunction call     (0,Nothing))
-       , ("puts",   VFunction puts     (0,Nothing))
+bootstrapset = fromList [
+         ("call",   Fn callFn)
+       , ("initialize", Fn initFn)  
+{-       , ("puts",   VFunction puts     (0,Nothing))
        , ("to_s",   VFunction to_s     (0,Just 0))
        , ("cls" ,   VFunction cls      (0, Just 0))
        , ("__initialize", VFunction initialize (0, Just 0))
@@ -45,12 +35,19 @@ bootstrapset = M.fromList [
        , ("extend", VFunction extendFn (1, Nothing))
        , ("modules",VFunction modulesFn  (0,Just 0))
        , ("method_missing", VFunction methodMissing (1, Nothing))
-       , ("initialize", VFunction initFn (0, Nothing))
+
        , ("==",     VFunction equality (1, Just 2))
+-}
        ]
 
-initFn _ = replyM_ VNil --by default, do nothing    
+initFn _ = reply Nil --by default, do nothing
 
+callFn :: Scope m => [Object] -> m ()
+callFn _ = throwError $ VError $ Err 
+   "RunTimeError" 
+   "Function call on an object that does not act like a function" 
+   []
+{-
 equality :: [Value] -> EvalM ()
 equality [other] = do -- try the other side first
   slf <- gets self
@@ -82,8 +79,6 @@ to_s [] = do
   case v of
     VNil -> replyM_ $ VString $ mkStringLiteral $ "<instance without to_s method>"
     _ -> replyM_ $ VString $ mkStringLiteral $ show v
-
-call _ = replyM_ $ VError $ Err "RunTimeError" "Function call on an object that does not act like a function" []
 
 puts :: [Value] -> EvalM ()
 puts vals = do
@@ -136,3 +131,4 @@ modulesFn :: [Value] -> EvalM()
 modulesFn _ = do
   slf <- gets self
   replyM_ $ VArray $ A.fromList $ map VObject $ modules slf
+-}

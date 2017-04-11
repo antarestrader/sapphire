@@ -27,6 +27,7 @@ type PID = R.PID Object
 -- mustr be a datatype to avoide impredictive types
 data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
         | AST {params :: Parameter, asts :: [Exp]}
+        | Cache {methodName :: Name, methodFunction :: Fn}
 
 data Object = Prim !Primitive
             | Process !PID

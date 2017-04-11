@@ -1,100 +1,79 @@
-module Builtin.Class where
+-- Copyright John F. Miller 2013-2017
+{-# LANGUAGE OverloadedStrings,  NamedFieldPuns #-}
+module Builtin.Class (classObject, classInit) where
 
-import Builtin.Utils
+import Data.Maybe
+
 import Object
-import Context
-import Object.Graph
-import Object.Spawn
-import Context
+import Object.Runtime
+import Scope (Scope(..),v,o, VariableContext( Local ))
+import Name
 import Err
-import Eval
-import AST
 import Var
-import String
-import Array
-import qualified Data.Map as M
-import Control.Monad.State
-import Control.Monad.IO.Class
-import Control.Monad.Except
-import Control.Concurrent.STM
-import System.IO.Unsafe
+import Data.Map.Strict (empty, fromList)
+import Control.Monad.State (get, put, modify)
 
-classClass :: Object -> IO Object
-classClass object = do
-  ctx <- newContextIO object undefined
-  Right (cls, _) <- flip runEvalM ctx $ do -- none of these operations can fail
-    setScope  object
-    setGlobal object
-    spawn $ Class{
-        ivars = M.fromList [("setClass",VFunction setClass (1,Just 1))],
-	klass = ROOT,
-	modules = [],
-	process = unsafePerformIO newEmptyTMVarIO,
-	super = object,
-	cvars = bootstrap,
-        cmodules = [],
-	properName = "Class"}
-  return cls
+classObject :: PID -> State
+classObject objPid =  Class {
+    ivars = empty
+  , instanceOfClass = undefined
+  , globalNamespace = objPid
+  , localNamespace = objPid
+  , localCache = empty
+  , superClass = objPid
+  , methods = bootstrap
+  , methodCache = empty
+  , modules = []
+  , uid = undefined
+  }
 
-bootstrap = M.fromList [
-         ("new"     , VFunction new   (0,Nothing))
-       , ("setCVar" , VFunction setCVar (2,Just 2))
-       , ("setIVar" , VFunction setIVar (2,Just 2))
-       , ("spawn"   , VFunction spawnFn (0,Nothing))
-       , ("to_s"    , VFunction to_s (0, Just 0 ))
-       , ("include" , VFunction includeFn (1, Nothing))
-       , ("cmodules", VFunction cmodulesFn (0, Just 0 ))
-       , ("instance_methods", VFunction instanceMethodsFn (0, Just 1 ))
+classInit :: Runtime()
+classInit = do
+  slf <- self
+  uid <- nextUID
+  modify (\st->st{instanceOfClass = slf, uid=uid})
+
+
+bootstrap :: Namespace Fn
+bootstrap = fromList [
+         ("new"     , Fn new)
+       , ("spawn"   , Fn spawnFn)
        ]
 
-setCVar [VAtom n,val] = do
-  modifySelf $ insertCVars n val
-  replyM_ val
-
-setIVar [VAtom n,val] = do
-  modifySelf $ insertIVars n val
-  replyM_ val
-
-new :: [Value] -> EvalM ()
 new vals = do
-  obj <- VObject `fmap` newObject
-  -- evalT $ Call (EValue obj) "initialize" $ map EValue vals 
-  replyM_ obj
+  obj <- newObject
+  setVar Local "obj" obj
+  val <- readVar Local "obj"
+  call val "initialize" vals
+  fromJust <$> readVar Local "obj" >>= reply . o
 
-spawnFn xs = do
+spawnFn args = do
   obj  <- newObject
-  obj'@(Pid pid) <- spawn obj
-  sendM pid $ Execute (simple "initialize") xs
-  replyM_ $ VObject obj'
+  pid <- spawn obj
+  send pid "initialize" args (\_ -> return ())
+  reply $ Process pid
 
-newObject :: EvalM Object
+-- todo write new and spawn for Class itself
+newObject :: Scope m => m Object
 newObject = do
-  slf <- gets self
-  tmvar <- liftIO $ newEmptyTMVarIO
-  slf' <- case slf of
-      pid@(Pid _) -> return pid
-      cls@Class{} -> do
-            pid <- liftIO $ atomically $ tryReadTMVar $ process cls
-            return $ maybe slf Pid pid
-      _ -> error "trying to make instantiate a regular object.  What would that even mean?"
-  return $  Object {
-      ivars = M.empty
-    , klass = slf'
-    , modules = []
-    , process =  tmvar
+  st <- get
+  slf <- self
+  uid <- nextUID
+  return $ Object $ Instance {
+      ivars = empty
+    , instanceOfClass = slf
+    , globalNamespace = globalNamespace st
+    , localNamespace = localNamespace st
+    , localCache = empty
+    , primitive = Nothing
+    , uid = uid
     }
 
 
-
-
+{-
 to_s [] = do
   (VObject Class{properName = s}) <- eval (EVar Self)
   replyM_ $ VString $ mkStringLiteral $ s
-
-setClass [VObject cls] = do
-  slf <- gets self
-  modify (\c -> c{self=slf{klass=cls}})
-  replyM_ VNil
 
 includeFn:: [Value] -> EvalM()
 includeFn mdls = do
@@ -120,5 +99,5 @@ instanceMethodsFn  :: [Value] -> EvalM()
 instanceMethodsFn _ = do -- TODO: for true values move through inheritance chain
    slf <- gets self
    replyM_ $ VArray $ fromList $ map VAtom $ M.keys $ cvars slf
-
+-}
 

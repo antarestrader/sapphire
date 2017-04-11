@@ -76,6 +76,9 @@ evalProcess init f name args = reset >> init >> f name args
     reset :: Runtime ()
     reset = RR.Runtime $ modify (\rts -> rts{RR.fn=f})
 
+mainProcess :: Runtime() -> Process
+mainProcess prgm "run" _ = prgm >> R.readResponse Nil
+mainProcess _ name args = instanceProcess name args 
 
 instanceProcess :: Name -> [Object] -> Runtime Object
 instanceProcess name args= do
