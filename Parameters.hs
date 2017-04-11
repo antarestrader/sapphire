@@ -1,3 +1,16 @@
+-- Copyright 2017 John F. Miller
+
+-- | Datatype for describing the formal parameters of a Sapphire function.
+--
+-- ==Examples
+--
+-- > def foo(bar, baz = 5, *qaax)
+--
+-- @bar@ is a normal required parameter.
+--
+-- @baz@ is an optional parameter with a default value of 5.
+--
+-- @qaax@ will be a (possibally empty) array with all remaining arguments.
 module Parameters (
     Parameter(..)
   )
@@ -8,14 +21,16 @@ import Data.List
 import {-# SOURCE #-} Object hiding (arity)
 import Name
 
+-- | Datatype for describing the formal parameters of a Sapphire function.
 data Parameter = 
-    P Name Parameter
-  | Empty
-  | Alternatives [Parameter]
-  | Asterisk Name
-  | Default Name Object Parameter
-  | Pattern Name Name Parameter
-  | Guard Fn Parameter
+    P Name Parameter -- ^ Normal named parameter
+  | Empty -- ^ No more parameters
+  | Alternatives [Parameter] -- ^ Alternatives for poor man's pattern match
+  | Asterisk Name -- ^ Group all remaining arguments into an array
+  | Default Name Object Parameter -- ^ A parameter with a default value 
+  | Pattern Name Name Parameter 
+    -- ^ Require the arg match class Name to succeed.
+  | Guard Fn Parameter -- ^ __Expiramental__: require Fn be true to succeed
 
 instance Show Parameter where
   show (Alternatives ps) = intercalate "\n" (map show ps)
