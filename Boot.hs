@@ -28,7 +28,8 @@ import Name
 
 -- | This function builds up the initial runtime. The run time includes
 --   Object and Class classes with the internal functions installed. The
---   object returned is an instance of Object sutable to running code.
+--   initialize function then runs the program in a specialized instance of
+--   Object called main.
 boot :: Options  -- ^ command line options
      -> Runtime () -- ^ The program to run after boot
      -> IO () -- ^ The action which is running the program
@@ -45,7 +46,9 @@ boot opts prgm = do
     Right _ -> exitSuccess
     Left err -> die (show err)
 
-
+-- The process which can "tie the knot" between Object and Class. This process
+-- will become Object and it will send its pid to a specially made Class
+-- object and then use that to configure its own state.
 initialProcess :: Runtime ()
                -> Name -> [Object] -> Runtime Object
 initialProcess prgm _ _ = do

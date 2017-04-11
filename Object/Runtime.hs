@@ -12,12 +12,14 @@ import Data.Map.Strict as M
 import Data.String
 
 import Object
-import Scope
+import Scope hiding (Class)
 import qualified Runtime as R hiding (Runtime)
 import qualified Runtime.Runtime as RR
 import Name
 import Eval
 
+-- Process (this filled our version of RR.Fn) is the function that runs at
+-- the heart of each process.
 type Process = Name -> [Object] -> Runtime Object
 
 instance (MonadState State) Runtime where
@@ -69,17 +71,22 @@ instance Scope Runtime where
     R.putState ss'{localScope = tail (localScope ss)}
     return $ v obj
 
-
-evalProcess :: Runtime() -> Process -> Process
+-- | a process that will first evaluate an action
+evalProcess :: Runtime() -- ^ Run this first  
+            -> Process  -- ^ Then act like this
+            -> Process  -- ^ resultes in this overall process
 evalProcess init f name args = reset >> init >> f name args
   where
     reset :: Runtime ()
     reset = RR.Runtime $ modify (\rts -> rts{RR.fn=f})
 
+-- | the specialized process used to actually run the source code of the
+--   program.  It is run in the context of an instance of Object.
 mainProcess :: Runtime() -> Process
 mainProcess prgm "run" _ = prgm >> R.readResponse Nil
 mainProcess _ name args = instanceProcess name args 
 
+-- | the basic process of most objects.
 instanceProcess :: Name -> [Object] -> Runtime Object
 instanceProcess name args= do
   r <- getMethod name args
@@ -93,18 +100,26 @@ instanceProcess name args= do
           Nothing ->
             throwError $ fromString $ "MethodMissing: "++name++" not found"
 
+-- | A specialized process that handles (or will) some special properties
+--   of classes while defering everything else to `instanceProcess`.
 classProcess = instanceProcess
 
 -- =============PRIVATE======================
 -- ------------------------------------------
 
+-- | unwraps the Fn datatype, applies the arguments, and evaluates
+--   the function.
 applyFn :: [Object] -> Fn -> Runtime Object
 applyFn args (Fn{fn}) = ap $ fn args
 applyFn args (AST{params, asts}) = ap $ mkFunct params asts args
 
+-- | Selectes the appropriate Process for a state
 processForState :: State -> Process
 processForState Instance{} = instanceProcess
+processForState Class{} = classProcess
 
+-- | Creates a scope and extracts a response without breaking proper tail
+--   calls.
 ap :: Runtime () -> Runtime Object
 ap fn = do
  ss <- R.getState

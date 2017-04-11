@@ -1,7 +1,8 @@
+-- Copyright 2017 John F. Miller
 {-# LANGUAGE OverloadedStrings #-}
-
+-- | Functions for working with "Parameters".
 module Eval.Parameters 
-  ( module Eval.Parameters
+  ( match, arity, checkArity
   , module Parameters
   )
 where
@@ -11,11 +12,16 @@ import Data.String
 import Data.List
 
 import Parameters
-import Object
+import Object hiding (arity)
 import Name
 import Scope
 import Array
 
+-- | Given some 'Parameter' set and the arguments, match attempts to assign
+--   local variables to these arguments base on the parameters described.
+--   The result an action yielding an Int which is the zero-index of the 
+--   alternative which succeeded. If there are no alternatives it returns 0.
+--   If the match fails a PatternMatchError is thrown.
 match :: Scope m => Parameter -> [Object] -> m (Int)
 match = match' 0
   where
@@ -40,6 +46,7 @@ match = match' 0
     alternatives i [] [p] ps = match' i p ps
     alternatives i errs (x:xs) ps = match' i x ps `catchError` (\err -> alternatives (i+1) (err:errs) xs ps)
 
+-- | determines the posible arity of a parameter set
 arity :: Parameter -> Arity
 arity ps = arity' (0,Just 0) ps
   where
@@ -59,6 +66,7 @@ arity ps = arity' (0,Just 0) ps
         max' (Just a) (Just b) = Just (max a b)
     arity' a (Guard _ x) = arity' a x
 
+-- | Will n parameters match the given Arity
 checkArity :: Arity -> Int -> Bool
 checkArity (min, Just max) x | (min <= x) && (x <= max) = True
 checkArity (min, Nothing)  x | (min <= x) = True
