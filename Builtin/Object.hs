@@ -10,7 +10,7 @@ import Scope hiding (Class)
 
 stateForObject :: PID -> PID -> UID-> State
 stateForObject objpid clspid uid = Class {
-    ivars = empty
+    ivars = empty -- TODO add "Class" and "Object"
   , instanceOfClass = clspid
   , globalNamespace = objpid
   , localNamespace = objpid

@@ -117,7 +117,7 @@ instanceProcess name args= do
 
 -- | A specialized process that handles (or will) some special properties
 --   of classes while defering everything else to `instanceProcess`.
-classProcess "getMethod" (Prim (Atom name):args) = undefined
+classProcess "getMethod" (Prim (VAtom name):args) = undefined
 classProcess name args = instanceProcess name args
 
 -- =============PRIVATE======================

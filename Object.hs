@@ -27,14 +27,13 @@ type PID = R.PID Object
 -- mustr be a datatype to avoide impredictive types
 data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
         | AST {params :: Parameter, asts :: [Exp]}
-        | Cache {methodName :: Name, methodFunction :: Fn}
 
 data Object = Prim !Primitive
             | Process !PID
             | TrueClass
             | FalseClass
             | Nil
-            | VFunction {function:: Fn, arity::Arity, fUID::UID}
+            | VFunction {function:: Fn, cacheable :: Bool, fUID::UID}
             | Object State
             | VError !(Err Object)
 
@@ -191,9 +190,7 @@ instance Show Object where
   show TrueClass = "true"
   show FalseClass = "false"
   show Nil = "nil"
-  show (VFunction _ (a,Just b) _) | a == b = "<function: ("++show a++")>"
-  show (VFunction _ (a,Just b) _) = "<function: ("++show a++", "++show b++")>"
-  show (VFunction _ (a,Nothing)_ ) = "<function: ("++show a++" ...)>"
+  show (VFunction{fUID}  ) = "<function: ("++show fUID++")>"
   show (Process p) = "<PID "++ show p ++">"
   show (VError e) = show e
   show (Object ROOT) = "ROOT"

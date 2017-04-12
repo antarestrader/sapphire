@@ -155,7 +155,7 @@ eval' (Lambda params exp) = do
   return $ v
     ( VFunction
         { function = AST params exp
-        , Object.arity = P.arity params
+        , cacheable = False
         , fUID = uid
         }
     )
