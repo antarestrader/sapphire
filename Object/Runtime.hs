@@ -6,6 +6,7 @@
 module Object.Runtime where
 
 import Prelude hiding (lookup)
+import Control.Applicative
 import Control.Monad.State hiding (State, state, ap)
 import Control.Monad.Except hiding (ap)
 import Data.Map.Strict as M
@@ -21,6 +22,8 @@ import Eval
 -- Process (this filled our version of RR.Fn) is the function that runs at
 -- the heart of each process.
 type Process = Name -> [Object] -> Runtime Object
+(<||>) = liftA2 (<|>)
+infixl 3 <||>
 
 instance (MonadState State) Runtime where
   get = objectState <$> R.getState
@@ -50,6 +53,18 @@ instance Scope Runtime where
             R.putState ss{localScope=scp'}
     return $ loop scp 0
 
+  getMethod name args = local <||> remote
+    where
+      local :: Runtime (Maybe Fn)
+      local = gets (M.lookup name . localCache)
+      remote :: Runtime (Maybe Fn)
+      remote = do
+        cls <- gets instanceOfClass
+        res <- call (Just $ Pointer cls) "getMethod" (Prim (VAtom name):args)
+        return $ case o res of
+          VFunction{function=fn} -> Just fn
+          otherwise -> Nothing
+
   spawn (Process pid) = return pid
   spawn (Object st) = do
     ss <- R.getState
@@ -72,7 +87,7 @@ instance Scope Runtime where
     return $ v obj
 
 -- | a process that will first evaluate an action
-evalProcess :: Runtime() -- ^ Run this first  
+evalProcess :: Runtime() -- ^ Run this first
             -> Process  -- ^ Then act like this
             -> Process  -- ^ resultes in this overall process
 evalProcess init f name args = reset >> init >> f name args
@@ -84,7 +99,7 @@ evalProcess init f name args = reset >> init >> f name args
 --   program.  It is run in the context of an instance of Object.
 mainProcess :: Runtime() -> Process
 mainProcess prgm "run" _ = prgm >> R.readResponse Nil
-mainProcess _ name args = instanceProcess name args 
+mainProcess _ name args = instanceProcess name args
 
 -- | the basic process of most objects.
 instanceProcess :: Name -> [Object] -> Runtime Object
@@ -102,7 +117,8 @@ instanceProcess name args= do
 
 -- | A specialized process that handles (or will) some special properties
 --   of classes while defering everything else to `instanceProcess`.
-classProcess = instanceProcess
+classProcess "getMethod" (Prim (Atom name):args) = undefined
+classProcess name args = instanceProcess name args
 
 -- =============PRIVATE======================
 -- ------------------------------------------
