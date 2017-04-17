@@ -117,7 +117,17 @@ instanceProcess name args= do
 
 -- | A specialized process that handles (or will) some special properties
 --   of classes while defering everything else to `instanceProcess`.
-classProcess "getMethod" (Prim (VAtom name):args) = undefined
+classProcess "getMethod" args@(Prim (VAtom name):_) = do
+    r <- method <||> local
+    case r of
+      Just fn -> return $ VFunction {function = fn, cacheable = False, fUID=0}
+      Nothing -> remote
+  where
+    method = gets (lookup name . methods)
+    local = gets (lookup name . methodCache)
+    remote = do
+      cls <- gets superClass
+      ap $ tailCall (Just $ Pointer cls) "getMethod" args
 classProcess name args = instanceProcess name args
 
 -- =============PRIVATE======================
