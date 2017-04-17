@@ -12,3 +12,5 @@ tmp/
 *.swp
 *~
 doc/*.html
+doc/html
+*.tmp
