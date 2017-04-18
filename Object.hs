@@ -20,12 +20,14 @@ import Parameters
 
 
 import qualified Runtime as R
+import qualified Runtime.Runtime as RR
 import Err
 
+type Response = RR.Response
 type Runtime = R.Runtime SystemState Object
 type PID = R.PID Object
 -- mustr be a datatype to avoide impredictive types
-data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m ()}
+data Fn = Fn  {fn :: forall m . Scope m =>[Object] -> m Response}
         | AST {params :: Parameter, asts :: [Exp]}
 
 data Object = Prim !Primitive

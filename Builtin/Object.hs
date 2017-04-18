@@ -42,7 +42,7 @@ bootstrapset = fromList [
 
 initFn _ = reply Nil --by default, do nothing
 
-callFn :: Scope m => [Object] -> m ()
+callFn :: Scope m => [Object] -> m a 
 callFn _ = throwError $ VError $ Err 
    "RunTimeError" 
    "Function call on an object that does not act like a function" 

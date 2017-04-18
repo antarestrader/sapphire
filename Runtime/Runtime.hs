@@ -8,7 +8,7 @@
 module Runtime.Runtime where
 
 import Control.Concurrent
-import Control.Monad.State (StateT, runStateT)
+import Control.Monad.State (StateT, execStateT)
 import Control.Monad.Except
 import Data.Map.Strict (Map, (!))
 import qualified Data.Map.Strict as M
@@ -20,7 +20,9 @@ import Name
 
 type RunTimeM s obj = StateT (RunTimeState s obj) (ExceptT obj IO)
 type ShadowMap obj = Map ThreadId (PID obj)
-type Fn st a = Name -> [a] -> Runtime st a a
+type Fn st a = Name -> [a] -> Runtime st a Response
+
+data Response = Response
 
 
 newtype Runtime st obj a = Runtime {unRuntime :: RunTimeM st obj a}
@@ -44,8 +46,8 @@ data RunTimeState st obj = RTS {
 
 run :: RunTimeState st obj 
     -> RunTimeM st obj a 
-    -> IO (Either obj (a, RunTimeState st obj))
-run s a = runExceptT $ runStateT a s
+    -> IO (Either obj (RunTimeState st obj))
+run s a = runExceptT $ execStateT a s
 
 markRTS :: StateClass st obj => RunTimeState st obj -> IO [PID obj]
 markRTS rts = ((M.elems (shadows rts)) ++) <$> markState (state rts) 

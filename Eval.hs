@@ -52,7 +52,7 @@ mkFunct :: Scope m
         => Parameter  -- formal parameters
         -> [Exp]      -- the set of possible expression to be evaluated (typically blocks)
         -> [Object]   -- the actual parameters
-        -> m ()
+        -> m Response
  -- NOTE: Apply is responsible for corectly creating the enclosing scope
 mkFunct params expList vals = do
     i <- match params vals
@@ -262,7 +262,7 @@ eval' exp =
         ("Cannot yet evaluate the following expression:\n" ++ show exp)
         []
 
-evalT :: Scope m => Exp -> m ()
+evalT :: Scope m => Exp -> m Response
 evalT = undefined
 
 

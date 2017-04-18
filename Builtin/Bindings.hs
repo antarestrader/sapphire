@@ -23,7 +23,7 @@ import Builtin.String
 import Builtin.Error
 -}
 
-initialize :: Runtime () -> Runtime (Value Runtime)
+initialize :: Runtime Response -> Runtime (Value Runtime)
 initialize prgm = do
   -- init modules here
   slf <- self 

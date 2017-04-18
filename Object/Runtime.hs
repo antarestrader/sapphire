@@ -21,7 +21,7 @@ import Eval
 
 -- Process (this filled our version of RR.Fn) is the function that runs at
 -- the heart of each process.
-type Process = Name -> [Object] -> Runtime Object
+type Process = Name -> [Object] -> Runtime RR.Response
 (<||>) = liftA2 (<|>)
 infixl 3 <||>
 
@@ -97,12 +97,12 @@ evalProcess init f name args = reset >> init >> f name args
 
 -- | the specialized process used to actually run the source code of the
 --   program.  It is run in the context of an instance of Object.
-mainProcess :: Runtime() -> Process
-mainProcess prgm "run" _ = prgm >> R.readResponse Nil
+mainProcess :: Runtime Response -> Process
+mainProcess prgm "run" _ = prgm 
 mainProcess _ name args = instanceProcess name args
 
 -- | the basic process of most objects.
-instanceProcess :: Name -> [Object] -> Runtime Object
+instanceProcess :: Name -> [Object] -> Runtime Response
 instanceProcess name args= do
   r <- getMethod name args
   case r of
@@ -117,17 +117,18 @@ instanceProcess name args= do
 
 -- | A specialized process that handles (or will) some special properties
 --   of classes while defering everything else to `instanceProcess`.
+classProcess :: Process
 classProcess "getMethod" args@(Prim (VAtom name):_) = do
     r <- method <||> local
     case r of
-      Just fn -> return $ VFunction {function = fn, cacheable = False, fUID=0}
+      Just fn -> reply $ VFunction {function = fn, cacheable = False, fUID=0}
       Nothing -> remote
   where
     method = gets (lookup name . methods)
     local = gets (lookup name . methodCache)
     remote = do
       cls <- gets superClass
-      ap $ tailCall (Just $ Pointer cls) "getMethod" args
+      tailCall (Just $ Pointer cls) "getMethod" args
 classProcess name args = instanceProcess name args
 
 -- =============PRIVATE======================
@@ -135,22 +136,13 @@ classProcess name args = instanceProcess name args
 
 -- | unwraps the Fn datatype, applies the arguments, and evaluates
 --   the function.
-applyFn :: [Object] -> Fn -> Runtime Object
-applyFn args (Fn{fn}) = ap $ fn args
-applyFn args (AST{params, asts}) = ap $ mkFunct params asts args
+applyFn :: [Object] -> Fn -> Runtime Response
+applyFn args (Fn{fn}) = fn args
+applyFn args (AST{params, asts}) = mkFunct params asts args
 
 -- | Selectes the appropriate Process for a state
 processForState :: State -> Process
 processForState Instance{} = instanceProcess
 processForState Class{} = classProcess
 
--- | Creates a scope and extracts a response without breaking proper tail
---   calls.
-ap :: Runtime () -> Runtime Object
-ap fn = do
- ss <- R.getState
- R.putState ss{localScope = (M.empty : (localScope ss))}
- fn
- ss' <- R.getState
- R.putState ss'{localScope = tail (localScope ss)}
- R.readResponse Nil
+

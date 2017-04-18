@@ -6,11 +6,13 @@ import System.Environment
 import Boot.Options
 import Boot.REPL
 import Object
+import Object.Runtime
+import Scope
 
-load :: FilePath -> Runtime ()
+load :: FilePath -> Runtime Response
 load = undefined
 
-parseArgs :: IO (Options, Runtime ())
+parseArgs :: IO (Options, Runtime Response)
 parseArgs = do
   args <- getArgs
   case args of
@@ -21,8 +23,8 @@ parseArgs = do
     [file] -> return (defaultOptions, runFiles [file])
     _ -> return (defaultOptions, repl)
 
-runFiles:: [String] -> Runtime ()
-runFiles [] = return ()
+runFiles:: [String] -> Runtime Response
+runFiles [] = reply Nil
 runFiles (file : files) = do
   load file
   runFiles files

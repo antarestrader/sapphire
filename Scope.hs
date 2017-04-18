@@ -48,12 +48,12 @@ class (MonadError Object m, MonadState State m) => Scope m where
   getMethod  :: Name -> [Object] -> m (Maybe Fn)
   self       :: m PID
   future     :: m PID
-  super      :: maybe [Object] -> m ()
-  newScope   :: m () -> m (Value m)
+  super      :: maybe [Object] -> m Response
+  newScope   :: m Response -> m (Value m)
   call       :: Maybe (Value m) -> Name -> [Object] -> m (Value m)
   send       :: PID -> Name -> [Object] -> (Object -> m ()) -> m ()
-  tailCall   :: Maybe (Value m) -> Name -> [Object] -> m ()
-  reply      :: Object -> m()
+  tailCall   :: Maybe (Value m) -> Name -> [Object] -> m Response
+  reply      :: Object -> m Response
   spawn      :: Object -> m PID 
   presidenceTable :: m (PrecedenceTable)
   nextUID    :: m UID

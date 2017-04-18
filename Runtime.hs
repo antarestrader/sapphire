@@ -47,7 +47,7 @@ instance (MonadError obj) (Runtime st obj) where
 
 apply :: (Obj obj, StateClass st obj) =>
          obj
-      -> Runtime st obj ()
+      -> Runtime st obj Response 
       -> Runtime st obj obj
 apply alt f = Runtime $ do
     rts <- get
@@ -144,8 +144,7 @@ runtime gc pid st f = loop st f
             }
           result <- run rts (unRuntime $ funct n ps)
           case result of
-            Right (obj, rts') -> do
-              atomically $ writeHole (response rts') obj
+            Right rts' -> do
               return (Just (state rts', fn rts'))
             Left e -> do
               atomically $ writeHole (error rts) e
@@ -180,8 +179,7 @@ shadowRuntime downstream = do
             Messaged (Call n ps sm res err) -> do
               result <- run rts{response = res, error = err} (unRuntime $ (fn rts) n ps)
               case result of
-                Right (obj, st') -> do
-                  atomically $ writeHole res obj
+                Right st' -> do
                   loop' rts{state = (state st')}
                 Left e -> do
                   atomically $ writeHole err e

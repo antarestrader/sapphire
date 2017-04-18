@@ -31,7 +31,7 @@ import Name
 --   initialize function then runs the program in a specialized instance of
 --   Object called main.
 boot :: Options  -- ^ command line options
-     -> Runtime () -- ^ The program to run after boot
+     -> Runtime Response -- ^ The program to run after boot
      -> IO () -- ^ The action which is running the program
 boot opts prgm = do
   uids <- newUIDSource
@@ -49,8 +49,8 @@ boot opts prgm = do
 -- The process which can "tie the knot" between Object and Class. This process
 -- will become Object and it will send its pid to a specially made Class
 -- object and then use that to configure its own state.
-initialProcess :: Runtime ()
-               -> Name -> [Object] -> Runtime Object
+initialProcess :: Runtime Response
+               -> Name -> [Object] -> Runtime Response
 initialProcess prgm _ _ = do
     objPid <- self
     uid <- nextUID
@@ -64,7 +64,6 @@ initialProcess prgm _ _ = do
     RR.Runtime $ modify (\rts -> rts{RR.fn=classProcess})
     main <- initialize prgm
     tailCall (Just main) "run" []
-    readResponse $ Process objPid
 
 initialState :: Options -> UIDSource -> SystemState
 initialState opts uids=  SystemState {
