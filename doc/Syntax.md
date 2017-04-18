@@ -131,6 +131,7 @@ least one digit following. They may optionally include an exponent with is an
 exponent.
 
 Examples:
+
     1               # Integer
     346322200010991 # Integer
     0.5 # Float

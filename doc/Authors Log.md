@@ -8,7 +8,7 @@ stable program release, but rather a record of thoughts and ideas recorded as
 Sapphire is constructed.
 
 This file is **not** covered under the code or documentation licences.  This
-file, Copyright &copy; 2013, 2014, 2015 by John F. Miller, is licenced under 
+file, Copyright &copy; 2013, 2014, 2015 by John F. Miller, is licenced under
 a [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License][licence].
 
 <a rel="license" href="http://creativecommons.org/licenses/by-nc-nd/4.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-nd/4.0/88x31.png" /></a>
@@ -223,7 +223,7 @@ receiving such a message is then obligated to use this new channel in preference
 to any others with the same tid, as they will be blocked waiting for a response.
 
 In fact sense many Pids could block on the same call chain, this will need to be
-some kind of list of shadowed Pids. This 
+some kind of list of shadowed Pids. This
 could be a performance bottleneck.
 
 There is also now the issue of needing the response and the message queue to
@@ -459,7 +459,7 @@ use the IO monad.
 
 ### Scope of Classes and Modules
 
-What is the expecte behavior when the interpreter encounters a `class` or 
+What is the expecte behavior when the interpreter encounters a `class` or
 `module` statement? Certianlly it should create a new class or reopen an
 existing one.  But where does it look?  The current comprimise is to put
 everything in `Object` but this is not the expected behavior.  Modules and
