@@ -4,5 +4,5 @@ haddock -h -o doc/html Main.hs
 
 for i in doc/*.md
 do 
-  Markdown.pl "$i" >> "$i.html"
+  pandoc -s -o "$i.html" "$i" 
 done
