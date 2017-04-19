@@ -9,7 +9,7 @@ import Prelude hiding (lookup)
 import Control.Applicative
 import Control.Monad.State hiding (State, state, ap)
 import Control.Monad.Except hiding (ap)
-import Control.Monad.STM (atomically)
+import Control.Monad.STM (STM, atomically)
 import Data.Map.Strict as M
 import Data.String
 
@@ -67,6 +67,19 @@ instance Scope Runtime where
           VFunction{function=fn} -> Just fn
           otherwise -> Nothing
 
+  self = R.self
+
+
+  tailCall (Just (Pointer pid)) name args = R.tail pid name args
+  tailCall Nothing name args = self >>= (\pid ->  R.tail pid name args)
+  tailCall (Just val) name args = undefined
+
+
+  reply obj = do
+    res <- RR.Runtime $ gets RR.response
+    atomic $ R.writeHole res obj
+    return RR.Response
+
   spawn (Process pid) = return pid
   spawn (Object st) = do
     ss <- R.getState
@@ -91,6 +104,15 @@ instance Scope Runtime where
   nextUID = do
     ss <- R.getState
     RR.Runtime $ liftIO $ atomically $ UID.nextUID $ uidSource ss
+
+
+
+-- ==================================================================
+-- Here endeth the Scope Instance
+-- ==================================================================
+
+atomic :: STM a -> Runtime a
+atomic = RR.Runtime . liftIO . atomically
 
 -- | a process that will first evaluate an action
 evalProcess :: Runtime() -- ^ Run this first

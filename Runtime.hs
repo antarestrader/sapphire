@@ -8,10 +8,11 @@ module Runtime (
     , getState, putState, apply, call, debug, runGC
     , readResponse
     , spawn, self, bootstrap, mkHole, readHole, writeHole
+    , tail
   ) where
 
 import qualified Prelude
-import Prelude hiding (lookup, error)
+import Prelude hiding (lookup, error, tail)
 import Control.Monad.State hiding (state, State)
 import qualified Control.Monad.State as St
 import Control.Monad.Except
@@ -27,7 +28,9 @@ import Runtime.PID
 import Runtime.GarbageCollector
 import Name
 
+-- | Retrieve whatever state has been associated with the runtime
 getState    = Runtime $ gets state
+-- | replace the state with a new state
 putState st = Runtime $ modify (\rst -> rst{state = st})
 
 instance (MonadError obj) (Runtime st obj) where
@@ -45,9 +48,10 @@ instance (MonadError obj) (Runtime st obj) where
 
   throwError = Runtime . throwError
 
+-- | take an action and extract the response from it.
 apply :: (Obj obj, StateClass st obj) =>
          obj
-      -> Runtime st obj Response 
+      -> Runtime st obj Response
       -> Runtime st obj obj
 apply alt f = Runtime $ do
     rts <- get
@@ -58,11 +62,14 @@ apply alt f = Runtime $ do
     modify (\rts -> rts{response = old_res})
     liftIO $ atomically $ maybeReadHole alt res
 
+-- | Get the object out of the response hole. If there is no response
+--   return the provided object (often Nil) instead.
 readResponse :: obj -> Runtime st obj obj
 readResponse alt = Runtime $  do
   res <- gets response
   liftIO $ atomically $ maybeReadHole alt res
 
+-- | Send a message to a PID and await its response.
 call :: (Obj obj, StateClass st obj) =>PID obj -> Name -> [obj] -> Runtime st obj obj
 call pid n ps = Runtime $ do
     RTS{shadows,ourself,error} <- get
@@ -80,6 +87,18 @@ call pid n ps = Runtime $ do
       Right obj -> put rts >> return obj
       Left  err -> throwError err
 
+-- | a tail call.  We will send along the shadows, response, and error we
+--   were called with and expect that the PID recieving will handle them
+--   appropriatly. This method fulfills the requirement that a method produce
+--   a response so we Provide a Response value for it.
+tail :: PID obj -> Name -> [obj] -> Runtime st obj Response
+tail pid name args = Runtime $ do
+  RTS{shadows, response, error} <- get
+  let pid' = M.findWithDefault pid (tID pid) shadows
+  liftIO $ atomically $ writePID pid' $ Call name args shadows response error
+  return Response
+
+-- | Start a new process
 spawn :: (Obj obj, StateClass st obj)
       => st
       -> Fn st obj
@@ -89,9 +108,12 @@ spawn st f = Runtime $ do
   pid <- liftIO $ spawnPID gc st f
   return pid
 
-self :: Obj obj => Runtime st obj obj
-self = Runtime $ gets (toObj . ourself)
+-- | Extract the PID of this process
+self :: Runtime st obj (PID obj)
+self = Runtime $ gets ourself
 
+-- | An IO action to start the first process.  All other processes should
+--   be created using spawn.
 bootstrap :: StateClass st obj=>
               st
           ->  Fn st obj
@@ -102,11 +124,15 @@ bootstrap  st fn = do
   rootSet gc [pid]
   return pid
 
+
+-- | manually invoke garbage collection
 runGC :: Runtime st obj ()
 runGC = Runtime $ do
   RTS{gc} <- get
   liftIO $ garbageCollector gc
 
+
+-- | a low level write to the console with no thread coordination.
 debug :: String -> Runtime st obj ()
 debug str = Runtime $ liftIO $ putStrLn str
 
