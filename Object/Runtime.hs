@@ -9,6 +9,7 @@ import Prelude hiding (lookup)
 import Control.Applicative
 import Control.Monad.State hiding (State, state, ap)
 import Control.Monad.Except hiding (ap)
+import Control.Monad.STM (atomically)
 import Data.Map.Strict as M
 import Data.String
 
@@ -18,6 +19,7 @@ import qualified Runtime as R hiding (Runtime)
 import qualified Runtime.Runtime as RR
 import Name
 import Eval
+import qualified Object.UID as UID
 
 -- Process (this filled our version of RR.Fn) is the function that runs at
 -- the heart of each process.
@@ -86,6 +88,10 @@ instance Scope Runtime where
     R.putState ss'{localScope = tail (localScope ss)}
     return $ v obj
 
+  nextUID = do
+    ss <- R.getState
+    RR.Runtime $ liftIO $ atomically $ UID.nextUID $ uidSource ss
+
 -- | a process that will first evaluate an action
 evalProcess :: Runtime() -- ^ Run this first
             -> Process  -- ^ Then act like this
@@ -98,7 +104,7 @@ evalProcess init f name args = reset >> init >> f name args
 -- | the specialized process used to actually run the source code of the
 --   program.  It is run in the context of an instance of Object.
 mainProcess :: Runtime Response -> Process
-mainProcess prgm "run" _ = prgm 
+mainProcess prgm "run" _ = prgm
 mainProcess _ name args = instanceProcess name args
 
 -- | the basic process of most objects.
