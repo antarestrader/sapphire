@@ -46,7 +46,7 @@ class (MonadError Object m, MonadState State m) => Scope m where
              -> [Exp] -- ^ The actions to execute, one per parameter (presumably block)
              -> m ()
   getMethod  :: Name -> [Object] -> m (Maybe Fn)
-  self       :: m PID
+  self       :: m (Value m)
   future     :: m PID
   super      :: maybe [Object] -> m Response
   newScope   :: m Response -> m (Value m)

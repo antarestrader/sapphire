@@ -71,4 +71,5 @@ initialState opts uids=  SystemState {
   , uidSource = uids
   , localScope = []
   , cmdLineOptions = opts
+  , reciever = Nothing
   }

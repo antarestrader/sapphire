@@ -85,11 +85,21 @@ instance Scope Runtime where
           VFunction{function=fn} -> Just fn
           otherwise -> Nothing
 
-  self = R.self
-
+  self = do
+    rec <- reciever <$> R.getState
+    case rec of
+      Nothing  -> Pointer <$> R.self
+      Just obj ->
+        let rep :: Object -> Runtime ()
+            rep obj = R.getState >>= (\ss -> R.putState ss{reciever=(Just obj)})
+         in return $ MV {obj,replace = rep}
 
   tailCall (Just (Pointer pid)) name args = R.tail pid name args
-  tailCall Nothing name args = self >>= (\pid ->  R.tail pid name args)
+  tailCall Nothing name args = do
+    slf <- self
+    case slf of
+      Pointer pid  ->  R.tail pid name args
+      val -> tailCall (Just val) name args
   tailCall (Just val) name args = undefined
 
 

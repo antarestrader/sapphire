@@ -158,6 +158,7 @@ data SystemState = SystemState
   , uidSource   :: UIDSource
   , localScope  :: [Namespace Object] --Note: Process is responsible for tracking this
   , cmdLineOptions :: Options
+  , reciever    :: Maybe Object -- Meaning the process itself when Nothing
   }
 
 instance R.StateClass SystemState Object where
