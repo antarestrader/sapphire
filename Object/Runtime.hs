@@ -89,6 +89,12 @@ instance Scope Runtime where
   call (Just (Pointer pid)) name args = RO <$> R.call pid name args
   call justVal name args = newScope $ tailCall justVal name args
 
+  send pid name args res = do
+    hole <- R.send pid name args
+    --TODO: read the hole and use the response
+    return ()
+
+
   self = do
     rec <- reciever <$> R.getState
     case rec of

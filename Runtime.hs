@@ -5,10 +5,10 @@ module Runtime (
       module Runtime.PID
     , Runtime
     , Obj(..), StateClass(..)
-    , getState, putState, apply, call, debug, runGC
-    , readResponse
-    , spawn, self, bootstrap, mkHole, readHole, writeHole
-    , tail
+    , getState, putState, apply, readResponse, self
+    , spawn, bootstrap, mkHole, readHole, writeHole
+    , call, send, tail
+    , debug, runGC
   ) where
 
 import qualified Prelude
@@ -87,7 +87,16 @@ call pid n ps = Runtime $ do
       Right obj -> put rts >> return obj
       Left  err -> throwError err
 
--- | a tail call.  We will send along the shadows, response, and error we
+send :: PID obj -> Name -> [obj] ->  Runtime st obj (Hole obj)
+send pid name args = Runtime $ do
+  RTS{shadows, error} <- get
+  let pid' = M.findWithDefault pid (tID pid) shadows
+  liftIO $ atomically$ do
+    response <- mkHole
+    writePID pid' $ Call name args shadows response error
+    return response
+
+-- | A tail call.  We will send along the shadows, response, and error we
 --   were called with and expect that the PID recieving will handle them
 --   appropriatly. This method fulfills the requirement that a method produce
 --   a response so we Provide a Response value for it.
