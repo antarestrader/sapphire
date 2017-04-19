@@ -71,7 +71,7 @@ instance Scope Runtime where
     modify (\s -> s{ivars=(insert name obj (ivars s))})
   setVar CVar name obj = do
     cls <- gets instanceOfClass
-    send cls "set_class_variable" [Prim(VAtom name), obj] (\_->return ())
+    send cls "set_class_variable" [Prim(VAtom name), obj] Nothing
 
   getMethod name args = local <||> remote
     where
@@ -89,11 +89,7 @@ instance Scope Runtime where
   call (Just (Pointer pid)) name args = RO <$> R.call pid name args
   call justVal name args = newScope $ tailCall justVal name args
 
-  send pid name args res = do
-    hole <- R.send pid name args
-    --TODO: read the hole and use the response
-    return ()
-
+  send = R.send
 
   self = do
     rec <- reciever <$> R.getState
@@ -127,7 +123,7 @@ instance Scope Runtime where
           , localScope = []
           }
         (processForState st)
-    send pid "initialize" [] (\_->return ())
+    send pid "initialize" [] Nothing
     return  pid
   spawn prim = undefined
 
@@ -141,7 +137,7 @@ instance Scope Runtime where
 
   nextUID = do
     ss <- R.getState
-    RR.Runtime $ liftIO $ atomically $ UID.nextUID $ uidSource ss
+    atomic $ UID.nextUID $ uidSource ss
 
 
 

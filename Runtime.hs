@@ -16,6 +16,7 @@ import Prelude hiding (lookup, error, tail)
 import Control.Monad.State hiding (state, State)
 import qualified Control.Monad.State as St
 import Control.Monad.Except
+import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Map.Strict (Map, (!))
 import qualified Data.Map.Strict as M
@@ -87,14 +88,21 @@ call pid n ps = Runtime $ do
       Right obj -> put rts >> return obj
       Left  err -> throwError err
 
-send :: PID obj -> Name -> [obj] ->  Runtime st obj (Hole obj)
-send pid name args = Runtime $ do
+send :: PID obj -> Name -> [obj] -> Maybe (PID obj, Name) -> Runtime st obj ()
+send pid name args res = Runtime $ do
   RTS{shadows, error} <- get
   let pid' = M.findWithDefault pid (tID pid) shadows
-  liftIO $ atomically$ do
+  hole <- liftIO $ atomically$ do
     response <- mkHole
     writePID pid' $ Call name args shadows response error
     return response
+  case res of
+    Nothing -> return ()
+    Just (destPID, repName) ->(liftIO $ forkIO $ atomically $ do
+        obj <- readHole hole
+        dummy <- mkHole
+        writePID destPID $ Call repName [obj] M.empty dummy dummy
+      ) >> return ()
 
 -- | A tail call.  We will send along the shadows, response, and error we
 --   were called with and expect that the PID recieving will handle them

@@ -50,7 +50,7 @@ new vals = do
 spawnFn args = do
   obj  <- newObject
   pid <- spawn obj
-  send pid "initialize" args (\_ -> return ())
+  send pid "initialize" args Nothing
   reply $ Process pid
 
 -- todo write new and spawn for Class itself

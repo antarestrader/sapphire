@@ -199,7 +199,7 @@ eval' (Send expr msg args) = do
   case target of
     Pointer pid -> do
         future <- future
-        send pid msg xs (\obj -> send future "return" [obj] (\_->return ()))
+        send pid msg xs $ Just (future,"return")
         return $ Pointer future
     val -> call (Just val) msg xs -- Cannot make an async call to a local val.
         -- Question: should this be silent? Warning? Error? option to choose?
@@ -226,7 +226,7 @@ eval' (Assign lhs exp) = eval exp >>=(\val -> assign lhs (o val) >> return val)
       args <- evalArgs args
       tar <- eval target
       case tar of
-        Pointer pid -> send pid (name++"=") (args++[obj]) (\_->return ())
+        Pointer pid -> send pid (name++"=") (args++[obj]) Nothing
         val ->  call (Just val) (name++"=") (args ++ [obj]) >> return ()
 -- OpAssign node covered by a rewrite rule above.
 eval' (If pred cons alt) = do

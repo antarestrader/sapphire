@@ -51,7 +51,7 @@ class (MonadError Object m, MonadState State m) => Scope m where
   super      :: maybe [Object] -> m Response
   newScope   :: m Response -> m (Value m)
   call       :: Maybe (Value m) -> Name -> [Object] -> m (Value m)
-  send       :: PID -> Name -> [Object] -> (Object -> m ()) -> m ()
+  send       :: PID -> Name -> [Object] -> (Maybe (PID,Name)) -> m ()
   tailCall   :: Maybe (Value m) -> Name -> [Object] -> m Response
   reply      :: Object -> m Response
   spawn      :: Object -> m PID 
