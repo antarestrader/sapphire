@@ -54,6 +54,24 @@ instance Scope Runtime where
                 loop' i (x:xs) = (x:(loop' (i-1) xs))
             R.putState ss{localScope=scp'}
     return $ loop scp 0
+  readVar CVar name = do
+    cls <- gets instanceOfClass
+    Just <$> call (Just (Pointer cls)) "get_class_variable" [Prim(VAtom name)]
+
+  setVar Local name obj = do
+    val <- readVar Local name
+    case val of
+      (Just val) -> replace val obj
+      Nothing -> do
+        ss <- R.getState
+        let (scp:xs) = localScope ss
+            scp' = ((insert name obj scp):xs)
+        R.putState ss{localScope=scp'}
+  setVar IVar name obj = do
+    modify (\s -> s{ivars=(insert name obj (ivars s))})
+  setVar CVar name obj = do
+    cls <- gets instanceOfClass
+    send cls "set_class_variable" [Prim(VAtom name), obj] (\_->return ())
 
   getMethod name args = local <||> remote
     where
