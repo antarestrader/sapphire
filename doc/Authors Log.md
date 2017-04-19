@@ -248,7 +248,7 @@ case of Haskell generation a result value in a function) responses are
 accommodated by means of a (T)Mvar.  This structure is either empty or holds a
 value.  Writing to a full MVar or reading from an empty one cause the thread to
 block (or in the STM case the transaction to retry) until the condition changes.
-In the naïve approach implemented in Master, a thread would place a call
+In the naive approach implemented in Master, a thread would place a call
 including this MVar into the message queue of another thread and then try to
 read the MVar -- blocking until the other thread filled it with the result.
 
