@@ -26,7 +26,7 @@ import Builtin.Error
 initialize :: Runtime Response -> Runtime (Value Runtime)
 initialize prgm = do
   -- init modules here
-  slf <- self 
+  Pointer slf <- self 
   uid <- nextUID
   ss <- R.getState
   mainPid <- R.spawn ss{

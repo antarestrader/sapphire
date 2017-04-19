@@ -85,6 +85,10 @@ instance Scope Runtime where
           VFunction{function=fn} -> Just fn
           otherwise -> Nothing
 
+  call Nothing name args = self >>= (\val -> call (Just val) name args)
+  call (Just (Pointer pid)) name args = RO <$> R.call pid name args
+  call justVal name args = newScope $ tailCall justVal name args
+
   self = do
     rec <- reciever <$> R.getState
     case rec of

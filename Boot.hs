@@ -52,7 +52,7 @@ boot opts prgm = do
 initialProcess :: Runtime Response
                -> Name -> [Object] -> Runtime Response
 initialProcess prgm _ _ = do
-    objPid <- self
+    Pointer objPid <- self
     uid <- nextUID
     ss <- R.getState
     clsPid <- R.spawn

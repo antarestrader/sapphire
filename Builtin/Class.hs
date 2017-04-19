@@ -6,7 +6,7 @@ import Data.Maybe
 
 import Object
 import Object.Runtime
-import Scope (Scope(..),v,o, VariableContext( Local ))
+import Scope (Scope(..),v,o, VariableContext( Local ), Value (..))
 import Name
 import Err
 import Var
@@ -29,7 +29,7 @@ classObject objPid =  Class {
 
 classInit :: Runtime()
 classInit = do
-  slf <- self
+  Pointer slf <- self
   uid <- nextUID
   modify (\st->st{instanceOfClass = slf, uid=uid})
 
@@ -57,7 +57,7 @@ spawnFn args = do
 newObject :: Scope m => m Object
 newObject = do
   st <- get
-  slf <- self
+  Pointer slf <- self
   uid <- nextUID
   return $ Object $ Instance {
       ivars = empty
